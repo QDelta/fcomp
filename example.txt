@@ -1,0 +1,17 @@
+(data List Nil (Cons Int List))
+(data FInt (FI [Int Int]))
+
+(def (f [x: Int]) (+ x x))
+(def (g [x: Int]) (+ (f x) 360))
+
+(def (len [l: List])
+  (case l
+    ((Nil) 0)
+    ((Cons h t) (+ 1 (len t)))))
+
+(def (concat [l1: List] [l2: List])
+  (case l1
+    ((Nil) l2)
+    ((Cons h1 t1) (Cons h1 (concat t1 l2)))))
+
+(def main (g (f (len (Cons 1 (Cons 2 Nil))))))

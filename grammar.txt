@@ -1,0 +1,15 @@
+    <program> ::= <definition>+
+ <definition> ::= <fnDef> | <dataDef>
+    <dataDef> ::= "(" "data" <name> <constructor>+ ")"
+<constructor> ::= <name> | "(" <name> <typeSig>+ ")"
+    <typeSig> ::= <name> | "[" <name>+ "]"
+      <fnDef> ::= "(" "def" <fnDecl> <expr> ")"
+     <fnDecl> ::= <name> | "(" <name> <parameter>+ ")"
+  <parameter> ::= "[" <name> ":" <name>+ "]"
+       <expr> ::= <number> | <name> | "(" <expr>+ ")" | <case>
+       <case> ::= "(" "case" <expr> <branch>+ ")"
+     <branch> ::= "(" <pattern> <expr> ")"
+    <pattern> ::= <name> | "(" <name>+ ")"
+
+       <name> ::= [^0-9:\(\)\[\]]+
+     <number> ::= [0-9]+
