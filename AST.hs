@@ -1,5 +1,12 @@
 module AST where
 
+data TypeSig
+  = AtomTS String
+  | ArrowTS TypeSig TypeSig
+  deriving (Show)
+
+type TypeDecl = (String, TypeSig)
+
 data Expr
   = VarE String 
   | ILitE Int 
@@ -7,19 +14,17 @@ data Expr
   | CaseE Expr [Branch]
   deriving (Show)
 
-data Pattern
-  = VarP String
-  | ConstrP String [String]
-  deriving (Show)
-
+type Pattern = [String]
 type Branch = (Pattern, Expr)
-type TypeSig = [String]
-type Parameter = (String, TypeSig)
 type Constructor = (String, [TypeSig])
 
-data Definition
-  = FnDef String [Parameter] Expr
-  | DataDef String [Constructor]
+type FnDef = (String, [String], Expr)
+type DataDef = (String, [Constructor])
+
+data Statement
+  = FnDSTMT FnDef
+  | DataDSTMT DataDef
+  | DeclSTMT TypeDecl
   deriving (Show)
 
-type Program = [Definition]
+type Program = [Statement]

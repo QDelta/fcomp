@@ -32,11 +32,10 @@ initialEnv :: Env
 initialEnv = (primFunc, primConstr, primType)
 
 typeSigToType :: TNameMap -> TypeSig -> Type
-typeSigToType _ [] = error "Empty type signature"
-typeSigToType tNM [n1] = mLookUp tNM n1
-typeSigToType tNM (n1 : rn) = FnT (mLookUp tNM n1) (typeSigToType tNM rn)
+typeSigToType tNM (AtomTS n) = mLookUp tNM n
+typeSigToType tNM (ArrowTS ts1 ts2) = FnT (typeSigToType tNM ts1) (typeSigToType tNM ts2)
 
--- retT -> [t1,...,tn] -> (t1->...->tn->retT)
+-- retType -> [t1,...,tn] -> (t1->...->tn->retType)
 multiFnT :: Type -> [Type] -> Type
 multiFnT = foldr FnT
 
@@ -44,23 +43,33 @@ addConstr :: TNameMap -> FNameMap -> (Type, Constructor) -> FNameMap
 addConstr tNM fNM (dType, (name, tSigs))
   = mInsert fNM (name, multiFnT dType (map (typeSigToType tNM) tSigs))
 
-typeCheckDef :: Env -> Definition -> (Env, Type)
-typeCheckDef (fNM, cNM, tNM) (DataDef name constrs)
+typeCheckStmt :: Env -> Statement -> (Env, Type)
+typeCheckStmt (fNM, cNM, tNM) (DataDSTMT (name, constrs))
   = ((fNM, newCNM, newTNM), dType)
   where
     dType = DataT name
     newTNM = mInsert tNM (name, dType)
     newCNM = foldl (addConstr newTNM) cNM (zip (repeat dType) constrs)
 
-typeCheckDef (fNM, cNM, tNM) (FnDef name params body)
-  = ((newFNM, cNM, tNM), fType)
+typeCheckStmt (fNM, cNM, tNM) (DeclSTMT (name, typeSig))
+  = ((mInsert fNM (name, fType), cNM, tNM), fType)
+  where fType = typeSigToType tNM typeSig
+
+typeCheckStmt (fNM, cNM, tNM) (FnDSTMT (name, params, body))
+  = ((fNM', cNM, tNM), fType)
   where
-    paramCount = length params
-    paramsWithT = map (second (typeSigToType tNM)) params
-    fNMTemp = foldl mInsert fNM paramsWithT
-    eType = typeCheckExpr cNM fNMTemp body
-    fType = multiFnT eType (map snd paramsWithT)
-    newFNM = mInsert (mDrop paramCount fNMTemp) (name, fType)
+    fType = mLookUp fNM name
+    (fNMTemp, expectBType) = paramBind (fNM, fType) params
+    actualBType = typeCheckExpr cNM fNMTemp body
+    fNM' = if actualBType == expectBType then fNM else error "Type Error: Fn"
+
+paramBind :: (FNameMap, Type) -> [String] -> (FNameMap, Type)
+paramBind = foldl paramBind1
+
+paramBind1 :: (FNameMap, Type) -> String -> (FNameMap, Type)
+paramBind1 (fNM, fType) name = case fType of
+  FnT t1 t2 -> (mInsert fNM (name, t1), t2)
+  _ -> error "Type Error: Fn"
 
 typeCheckExpr :: CNameMap -> FNameMap -> Expr -> Type
 typeCheckExpr cNM fNM expr = case expr of
@@ -73,19 +82,33 @@ typeCheckExpr cNM fNM expr = case expr of
       t2 | t2 == t11 -> t12
          | otherwise -> error errMsg
     _ -> error errMsg
-    where errMsg = "Invalid application: " ++ show e1 ++ " " ++ show e2
-  CaseE e bs -> error ""
-    where eType = typeCheckExpr cNM fNM expr
+    where errMsg = "Type Error: expr applicaton"
+  CaseE e bs -> finalType
+    where 
+      eType = typeCheckExpr cNM fNM e
+      brTPairs = map (typeCheckBranch cNM fNM eType) bs
+      finalType = typeCheckAllBr eType brTPairs
 
-patBind :: FNameMap -> String -> [String] -> (Type, FNameMap)
-patBind fNM constrName
-  = multiFnBind (mLookUp fNM constrName)
+-- pattern type, body expr type
+typeCheckBranch :: CNameMap -> FNameMap -> Type -> Branch -> (Type, Type)
+typeCheckBranch cNM fNM eType (pat, body) = (pType, bType)
+  where
+    (fNMTemp, pType) = patBind cNM fNM eType pat
+    bType = typeCheckExpr cNM fNMTemp body
 
-multiFnBind :: Type -> [String] -> (Type, FNameMap)
-multiFnBind t (n1 : ns) = case t of
-  FnT t1 t2 -> second (`mInsert` (n1, t1)) (multiFnBind t2 ns) 
-  _ -> error "Invalid constructor"
-multiFnBind t [] = case t of
-  DataT _ -> (t, emptyMap)
-  _ -> error "Invalid constructor"
+patBind :: CNameMap -> FNameMap -> Type -> Pattern -> (FNameMap, Type)
+patBind _ fNM eType [name] = (mInsert fNM (name, eType), eType)
+patBind cNM fNM _ (name : binds) = paramBind (fNM, mLookUp cNM name) binds
+
+typeCheckAllBr :: Type -> [(Type, Type)] -> Type
+typeCheckAllBr eType brTPairs
+  = if properCase then allEqType bTypes else error "Type Error: constructor type"
+  where
+    (pTypes, bTypes) = unzip brTPairs
+    properCase = all (== eType) pTypes
+    allEqType (h : t) = if all (== h) t then h else error "Type Error: expression in case"
+    allEqType [] = error "Type Error: No branches"
+
+typeCheckProgram :: Program -> (Env, [Type])
+typeCheckProgram = mapAccumL typeCheckStmt initialEnv
 

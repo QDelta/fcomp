@@ -5,9 +5,8 @@ import AST
 
 data Token 
   = LParen | RParen
-  | LBrack | RBrack
   | DefKW  | DataKW | CaseKW
-  | Colon
+  | Colon  | Arrow
   | NumTok Int 
   | NameTok String
   deriving (Show, Eq)
@@ -17,16 +16,14 @@ tlex s = case s of
   [] -> []
   c : cs
     | isSpace c -> tlex cs
-    | c == ':'  -> Colon  : tlex cs
     | c == '('  -> LParen : tlex cs
     | c == ')'  -> RParen : tlex cs
-    | c == '['  -> LBrack : tlex cs
-    | c == ']'  -> RBrack : tlex cs
+    | c == ':'  -> Colon  : tlex cs
     | isDigit c -> let (i, rest) = numLex c cs in NumTok i : tlex rest
     | otherwise -> let (n, rest) = nameLex c cs in n : tlex rest
 
 isNameChar :: Char -> Bool
-isNameChar c = not (isSpace c || c `elem` ":()[]")
+isNameChar c = not (isSpace c || c `elem` ":()")
 
 numLex :: Char -> String -> (Int, String)
 numLex c cs = (i, rest)
@@ -41,6 +38,7 @@ nameLex c cs = (tn, rest)
           "def"  -> DefKW
           "data" -> DataKW
           "case" -> CaseKW
+          "->"   -> Arrow
           _      -> NameTok n
 
 type Parser a = [Token] -> Maybe (a, [Token])
@@ -66,14 +64,8 @@ pleft pa pb = pmap fst (pseq pa pb)
 paddRParen :: Parser a -> Parser a
 paddRParen p = pleft p (pSym RParen)
 
-paddRBrack :: Parser a -> Parser a
-paddRBrack p = pleft p (pSym RBrack)
-
 pParened :: Parser a -> Parser a
 pParened p = pleft (pright (pSym LParen) p) (pSym RParen)
-
-pBracked :: Parser a -> Parser a
-pBracked p = pleft (pright (pSym LBrack) p) (pSym RBrack)
 
 pstar :: Parser a -> Parser [a]
 pstar p ts = case p ts of
@@ -97,18 +89,17 @@ pName ts = case ts of
   _  -> Nothing 
 
 pProgram :: Parser Program
-pProgram = pplus pDef
+pProgram = pplus pStmt
 
-pDef :: Parser Definition
-pDef ts = case ts of
-  LParen : DataKW : rest -> paddRParen pData rest
-  LParen : DefKW : rest -> paddRParen pFn rest
+pStmt :: Parser Statement 
+pStmt ts = case ts of
+  LParen : DataKW : rest -> pmap DataDSTMT (paddRParen pData) rest
+  LParen : DefKW : rest -> pmap FnDSTMT (paddRParen pFn) rest
+  LParen : Colon : rest -> pmap DeclSTMT (paddRParen pTypeDecl) rest
   _ -> Nothing
 
-pData :: Parser Definition
-pData ts = case pseq pName (pplus pConstructor) ts of
-  Just ((n, ps), rest) -> Just (DataDef n ps, rest)
-  Nothing -> Nothing
+pData :: Parser DataDef 
+pData = pseq pName (pplus pConstructor)
 
 pConstructor :: Parser Constructor
 pConstructor ts = case ts of
@@ -117,30 +108,28 @@ pConstructor ts = case ts of
 
 pTypeSig :: Parser TypeSig
 pTypeSig ts = case ts of
-  NameTok n : rest -> Just ([n], rest)
-  _ -> pBracked (pplus pName) ts
+  NameTok n : rest -> Just (AtomTS n, rest)
+  LParen : Arrow : r1 -> case paddRParen (pplus pTypeSig) r1 of
+    Just (ts, rest) -> Just (multiArrowTS ts, rest)
+    _ -> Nothing 
+  _ -> Nothing
+
+multiArrowTS :: [TypeSig] -> TypeSig
+multiArrowTS [t] = t
+multiArrowTS (t1 : ts) = ArrowTS t1 (multiArrowTS ts)
 
 pPattern :: Parser Pattern
 pPattern ts = case ts of
-  NameTok n : rest -> Just (VarP n, rest)
-  _ -> case pParened (pseq pName (pstar pName)) ts of
-    Just ((name, constrs), rest) -> Just (ConstrP name constrs, rest)
-    Nothing -> Nothing
+  NameTok n : rest -> Just ([n], rest)
+  LParen : r1 -> paddRParen (pplus pName) r1
 
-pParam :: Parser Parameter 
-pParam = pBracked (pseq (pleft pName (pSym Colon)) (pplus pName))
+pFn :: Parser FnDef
+pFn ts = case pseq pPattern pExpr ts of
+  Just ((name : params, body), rest) -> Just ((name, params, body), rest)
+  _ -> Nothing
 
-pFn :: Parser Definition
-pFn ts = case pseq pFnDecl pExpr ts of
-  Just (((name, params), body), rest) -> Just (FnDef name params body, rest)
-  Nothing -> Nothing
-
-pFnDecl :: Parser (String, [Parameter])
-pFnDecl ts = case ts of
-  NameTok n : rest -> Just ((n, []), rest)
-  LParen : NameTok n : r1 -> case paddRParen (pplus pParam) r1 of
-    Just (ps, rest) -> Just ((n, ps), rest)
-    Nothing -> Nothing
+pTypeDecl :: Parser TypeDecl 
+pTypeDecl = pseq pName pTypeSig
 
 pExpr :: Parser Expr
 pExpr ts = case ts of
@@ -161,5 +150,5 @@ pBranch ts = case ts of
 
 parse :: String -> Program
 parse s = case pProgram (tlex s) of
-  Just (p, _) -> p
+  Just (p, []) -> p
   Nothing -> error "ParseError"

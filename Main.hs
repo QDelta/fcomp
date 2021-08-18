@@ -8,4 +8,4 @@ main :: IO ()
 main = do
   srcFile : _ <- getArgs 
   prog <- readFile srcFile
-  print $ parse prog
+  print $ (typeCheckProgram . parse) prog

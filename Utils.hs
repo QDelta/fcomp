@@ -23,6 +23,9 @@ mFromList l = l
 mDrop :: Int -> Map k v -> Map k v
 mDrop = drop
 
+mCount :: Map k v -> Int 
+mCount = length
+
 emptyMap :: Map k v
 emptyMap = []
 
@@ -31,3 +34,10 @@ first f (x, y) = (f x, y)
 
 second :: (b -> c) -> (a, b) -> (a, c)
 second f (x, y) = (x, f y)
+
+mapAccumL :: (a -> b -> (a, c)) -> a -> [b] -> (a, [c])
+mapAccumL f acc [] = (acc, [])
+mapAccumL f acc (x : xs) = (acc2, x' : xs')
+  where
+    (acc1, x') = f acc x
+    (acc2, xs') = mapAccumL f acc1 xs
