@@ -1,35 +1,25 @@
-module Type where
+module Type.Check where
 
 import Utils
 import AST
-
-data Type
-  = IntT
-  | DataT String
-  | FnT Type Type
-  deriving (Show, Eq)
+import Type.Def
 
 type FNameMap = Map String Type
 type TNameMap = Map String Type
 type CNameMap = Map String Type
-type Env = (FNameMap, CNameMap, TNameMap) -- function, constructor, type
+type TypeEnv = (FNameMap, CNameMap, TNameMap) -- function, constructor, type
 
 primFunc :: FNameMap
-primFunc = mFromList
-  [ ("+", FnT IntT (FnT IntT IntT)),
-    ("-", FnT IntT (FnT IntT IntT)),
-    ("*", FnT IntT (FnT IntT IntT)),
-    ("/", FnT IntT (FnT IntT IntT))
-  ]
+primFunc = emptyMap
 
 primConstr :: CNameMap
 primConstr = emptyMap 
 
 primType :: TNameMap
-primType = mFromList [("Int", IntT)]
+primType = emptyMap
 
-initialEnv :: Env
-initialEnv = (primFunc, primConstr, primType)
+initialTypeEnv :: TypeEnv
+initialTypeEnv = (primFunc, primConstr, primType)
 
 typeSigToType :: TNameMap -> TypeSig -> Type
 typeSigToType tNM (AtomTS n) = mLookUp tNM n
@@ -43,7 +33,7 @@ addConstr :: TNameMap -> FNameMap -> (Type, Constructor) -> FNameMap
 addConstr tNM fNM (dType, (name, tSigs))
   = mInsert fNM (name, multiFnT dType (map (typeSigToType tNM) tSigs))
 
-typeCheckStmt :: Env -> Statement -> (Env, Type)
+typeCheckStmt :: TypeEnv -> Statement -> (TypeEnv, Type)
 typeCheckStmt (fNM, cNM, tNM) (DataDSTMT (name, constrs))
   = ((fNM, newCNM, newTNM), dType)
   where
@@ -73,7 +63,6 @@ paramBind1 (fNM, fType) name = case fType of
 
 typeCheckExpr :: CNameMap -> FNameMap -> Expr -> Type
 typeCheckExpr cNM fNM expr = case expr of
-  ILitE _ -> IntT
   VarE name -> case mLookUpMaybe fNM name of
     Just t -> t
     Nothing -> mLookUp cNM name
@@ -109,6 +98,6 @@ typeCheckAllBr eType brTPairs
     allEqType (h : t) = if all (== h) t then h else error "Type Error: expression in case"
     allEqType [] = error "Type Error: No branches"
 
-typeCheckProgram :: Program -> (Env, [Type])
-typeCheckProgram = mapAccumL typeCheckStmt initialEnv
+typeCheckProgram :: Program -> (TypeEnv, [Type])
+typeCheckProgram = mapAccumL typeCheckStmt initialTypeEnv
 

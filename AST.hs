@@ -8,8 +8,7 @@ data TypeSig
 type TypeDecl = (String, TypeSig)
 
 data Expr
-  = VarE String 
-  | ILitE Int 
+  = VarE String
   | ApE Expr Expr
   | CaseE Expr [Branch]
   deriving (Show)

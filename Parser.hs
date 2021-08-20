@@ -1,13 +1,12 @@
 module Parser where
 
-import Data.Char (isDigit, isSpace)
+import Data.Char (isSpace)
 import AST
 
 data Token 
   = LParen | RParen
   | DefKW  | DataKW | CaseKW
   | Colon  | Arrow
-  | NumTok Int 
   | NameTok String
   deriving (Show, Eq)
 
@@ -19,27 +18,22 @@ tlex s = case s of
     | c == '('  -> LParen : tlex cs
     | c == ')'  -> RParen : tlex cs
     | c == ':'  -> Colon  : tlex cs
-    | isDigit c -> let (i, rest) = numLex c cs in NumTok i : tlex rest
     | otherwise -> let (n, rest) = nameLex c cs in n : tlex rest
 
 isNameChar :: Char -> Bool
 isNameChar c = not (isSpace c || c `elem` ":()")
 
-numLex :: Char -> String -> (Int, String)
-numLex c cs = (i, rest)
-  where i = read (c : numr)
-        (numr, rest) = span isDigit cs
-
 nameLex :: Char -> String -> (Token, String)
 nameLex c cs = (tn, rest)
-  where n = c : name'
-        (name', rest) = span isNameChar cs
-        tn = case n of
-          "def"  -> DefKW
-          "data" -> DataKW
-          "case" -> CaseKW
-          "->"   -> Arrow
-          _      -> NameTok n
+  where 
+    n = c : name'
+    (name', rest) = span isNameChar cs
+    tn = case n of
+      "def"  -> DefKW
+      "data" -> DataKW
+      "case" -> CaseKW
+      "->"   -> Arrow
+      _      -> NameTok n
 
 type Parser a = [Token] -> Maybe (a, [Token])
 
@@ -80,8 +74,10 @@ pplus p ts = case pseq p (pstar p) ts of
   Nothing -> Nothing
 
 pSym :: Token -> Parser Token
-pSym t (h : rest) | t == h = Just (h, rest)
-pSym _ _ = Nothing
+pSym t (h : rest) 
+  | t == h = Just (h, rest)
+  | otherwise = Nothing
+pSym _ [] = Nothing
 
 pName :: Parser String
 pName ts = case ts of
@@ -133,7 +129,6 @@ pTypeDecl = pseq pName pTypeSig
 
 pExpr :: Parser Expr
 pExpr ts = case ts of
-  NumTok i : rest -> Just (ILitE i, rest)
   NameTok n : rest -> Just (VarE n, rest)
   LParen : NameTok n : r1 -> case paddRParen (pstar pExpr) r1 of
     Just (es, rest) -> Just (foldl ApE (VarE n) es, rest)
@@ -151,4 +146,4 @@ pBranch ts = case ts of
 parse :: String -> Program
 parse s = case pProgram (tlex s) of
   Just (p, []) -> p
-  Nothing -> error "ParseError"
+  _ -> error "ParseError"

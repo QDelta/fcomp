@@ -2,7 +2,7 @@ module Main where
 
 import System.Environment (getArgs)
 import Parser
-import Type
+import Type.Check
 
 main :: IO ()
 main = do
