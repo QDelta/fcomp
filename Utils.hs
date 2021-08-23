@@ -2,17 +2,17 @@ module Utils where
 
 type Map k v = [(k, v)]
 
-mLookUp :: Eq k => Map k v -> k -> v
-mLookUp [] _ = error "Map: nonexistent key"
-mLookUp ((k0, v0) : m')  k 
+mLookup :: Eq k => Map k v -> k -> v
+mLookup [] _ = error "Map: nonexistent key"
+mLookup ((k0, v0) : m') k 
   | k == k0 = v0
-  | otherwise = mLookUp m' k
+  | otherwise = mLookup m' k
 
-mLookUpMaybe :: Eq k => Map k v -> k -> Maybe v
-mLookUpMaybe [] _ = Nothing 
-mLookUpMaybe ((k0, v0) : m')  k 
+mLookupMaybe :: Eq k => Map k v -> k -> Maybe v
+mLookupMaybe [] _ = Nothing 
+mLookupMaybe ((k0, v0) : m') k 
   | k == k0 = Just v0
-  | otherwise = mLookUpMaybe m' k
+  | otherwise = mLookupMaybe m' k
 
 mInsert :: Map k v -> (k, v) -> Map k v
 mInsert = flip (:)

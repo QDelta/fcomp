@@ -1,6 +1,5 @@
 module Parser where
 
-import Data.Char (isSpace)
 import AST
 
 data Token 
@@ -19,6 +18,9 @@ tlex s = case s of
     | c == ')'  -> RParen : tlex cs
     | c == ':'  -> Colon  : tlex cs
     | otherwise -> let (n, rest) = nameLex c cs in n : tlex rest
+
+isSpace :: Char -> Bool
+isSpace c = c `elem` " \t\r\n"
 
 isNameChar :: Char -> Bool
 isNameChar c = not (isSpace c || c `elem` ":()")

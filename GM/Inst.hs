@@ -2,7 +2,7 @@ module GM.Inst where
 
 import Utils
 
-data GMInst
+data Instruction
   = PushG  String
   | Push   Int
   | Pop    Int
@@ -10,7 +10,7 @@ data GMInst
   | Update Int
   | Pack   Int Int
   | Split
-  | Jump   (Map Int [GMInst])
+  | Jump   (Map Int [Instruction])
   | Slide  Int
   | Eval
   | Alloc  Int
@@ -28,5 +28,3 @@ data GMInst
 
 -- compile :: TypeEnv -> Expr -> [GMInst]
 -- compile _ (ILitE n) = [PushI n]
-
-
