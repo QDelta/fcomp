@@ -19,3 +19,6 @@ hLookUp (m, _) = mLookup m
 
 hUpdate :: Heap a -> (Addr, a) -> Heap a
 hUpdate (m, r) p = (mInsert m p, r)
+
+hShow :: Show a => Heap a -> String
+hShow (m, r) = show m

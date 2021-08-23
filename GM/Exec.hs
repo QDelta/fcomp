@@ -9,6 +9,7 @@ data Node
   | NGlobal Int Code
   | NInd Addr
   | NData Int [Addr]
+  deriving (Show)
 
 type Code = [Instruction]
 type GlobalMap = Map String Addr
@@ -80,3 +81,10 @@ step (Pop n) (i, s, d, h, m) =
 run :: State -> State
 run (i : is, s, d, h, m) = run $ step i (is, s, d, h, m)
 run state@([], _, _, _, _) = state
+
+showState :: State -> String
+showState (i, s, d, h, m) =
+  "Code: " ++ show i ++ "\n" ++
+  "Stack: " ++ show s ++ "\n" ++
+  "Dump: " ++ show d ++ "\n" ++
+  "Heap: " ++ hShow h ++ "\n"
