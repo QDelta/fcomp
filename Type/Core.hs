@@ -6,6 +6,7 @@ module Type.Core where
 data CoreExpr
   = GVarCE String
   | LVarCE Int
+  | IntCE  Int
   | AppCE CoreExpr CoreExpr
   | CaseCE CoreExpr [(Int, Int, CoreExpr)] -- arity, tag, body
   deriving (Show)

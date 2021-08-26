@@ -4,10 +4,18 @@ import Utils
 import GM.Heap
 import GM.Def
 
+assertInt :: Node -> Int
+assertInt (NInt n) = n
+assertInt _ = error "Not int"
+
 step :: Instruction -> State -> State
 
 step (PushG name) (i, s, d, h, m) =
   (i, mLookup m name : s, d, h, m)
+
+step (PushI n) (i, s, d, h, m) =
+  (i, a : s, d, newH, m)
+  where (newH, a) = hAlloc h (NInt n)
 
 step (Push offset) (i, s, d, h, m) =
   (i, (s !! offset) : s, d, h, m)
@@ -16,8 +24,29 @@ step MkApp (i, a0 : a1 : s, d, h, m) =
   (i, a : s, d, newH, m)
   where (newH, a) = hAlloc h (NApp a0 a1)
 
+step Add (i, a0 : a1 : s, d, h, m) =
+  (i, a : s, d, newH, m)
+  where
+    n0 = assertInt (hLookup h a0)
+    n1 = assertInt (hLookup h a1)
+    (newH, a) = hAlloc h (NInt (n0 + n1))
+
+step Sub (i, a0 : a1 : s, d, h, m) =
+  (i, a : s, d, newH, m)
+  where
+    n0 = assertInt (hLookup h a0)
+    n1 = assertInt (hLookup h a1)
+    (newH, a) = hAlloc h (NInt (n0 - n1))
+
+step Mul (i, a0 : a1 : s, d, h, m) =
+  (i, a : s, d, newH, m)
+  where
+    n0 = assertInt (hLookup h a0)
+    n1 = assertInt (hLookup h a1)
+    (newH, a) = hAlloc h (NInt (n0 * n1))
+
 step Unwind (i, a : s, d, h, m) =
-  case hLookUp h a of
+  case hLookup h a of
     NApp a0 _   -> (Unwind : i, a0 : a : s, d, h, m)
     NInd a'     -> (Unwind : i,     a' : s, d, h, m)
     NGlobal n c 
@@ -25,7 +54,7 @@ step Unwind (i, a : s, d, h, m) =
       | otherwise -> (prevI, last (a : s) : prevS, prevD, h, m)
       where 
         (prevI, prevS) : prevD = d
-        args = map (getArg . hLookUp h) s
+        args = map (getArg . hLookup h) s
         getArg (NApp _ a1) = a1
     _ -> (prevI, a : prevS, prevD, h, m)
       where (prevI, prevS) : prevD = d
@@ -40,12 +69,12 @@ step (Pack t n) (i, s, d, h, m) =
     (newH, a) = hAlloc h (NData t params)
 
 step Split (i, a : s, d, h, m) =
-  case hLookUp h a of
+  case hLookup h a of
     NData t params -> (i, params ++ s, d, h, m)
     _ -> error "GM: run split non-data"
 
 step (Jump brs) (i, a : s, d, h, m) =
-  case hLookUp h a of
+  case hLookup h a of
     NData t _ -> (mLookup brs t ++ i, a : s, d, h, m)
     _ -> error "GM: run jump non-data"
 

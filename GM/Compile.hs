@@ -37,6 +37,8 @@ compileE :: Frame -> CoreExpr -> Code
 
 compileE _ (GVarCE name) = [PushG name]
 
+compileE _ (IntCE n) = [PushI n]
+
 compileE f (LVarCE i) = [Push (getOffset f i)]
 
 compileE f (AppCE e1 e2) =
@@ -55,20 +57,29 @@ compileBranch :: Frame -> (Int, Int, CoreExpr) -> (Int, Code)
 compileBranch f (arity, tag, body) = (tag, Split : code ++ [Slide arity])
   where code = compileE (pushStack f arity) body
 
-compileFn :: CoreFn -> Code
+type CompiledCoreFn = (String, Int, Code)
+
+compileFn :: CoreFn -> CompiledCoreFn
 compileFn (name, arity, body) =
-  bCode ++ [Slide (arity + 1)]
+ (name, arity, bCode ++ [Slide (arity + 1)])
   where bCode = compileE (initialFrame arity) body
 
 compileConstr :: CoreConstr -> Code
 compileConstr (name, arity, tag) =
   replicate arity (Push (arity - 1)) ++ [Pack tag arity]
 
+compiledPrimFn :: [CompiledCoreFn] -- name, arity, code
+compiledPrimFn =
+  [ ("+", 2, [Push 1, Eval, Push 1, Eval, Add, Slide 2]),
+    ("-", 2, [Push 1, Eval, Push 1, Eval, Sub, Slide 2]),
+    ("*", 2, [Push 1, Eval, Push 1, Eval, Mul, Slide 2])
+  ]
+
 initialState :: CoreProgram -> State
 initialState (constrs, fns) = ([PushG "main", Eval], [], [], initialHeap, initialGlobalM)
   where
     (heap1, gm1) = foldl allocConstr (emptyHeap, emptyMap) constrs
-    (initialHeap, initialGlobalM) = foldl allocFn (heap1, gm1) fns
+    (initialHeap, initialGlobalM) = foldl allocFn (heap1, gm1) (compiledPrimFn ++ map compileFn fns)
 
 allocConstr :: (Heap Node, GlobalMap) -> CoreConstr -> (Heap Node, GlobalMap)
 allocConstr (h, m) cons@(n, a, t) = (newH, newM)
@@ -76,8 +87,8 @@ allocConstr (h, m) cons@(n, a, t) = (newH, newM)
     (newH, addr) = hAlloc h (NGlobal a (compileConstr cons))
     newM = mInsert m (n, addr)
 
-allocFn :: (Heap Node, GlobalMap) -> CoreFn -> (Heap Node, GlobalMap)
-allocFn (h, m) f@(n, a, b) = (newH, newM)
+allocFn :: (Heap Node, GlobalMap) -> CompiledCoreFn -> (Heap Node, GlobalMap)
+allocFn (h, m) f@(n, a, c) = (newH, newM)
   where
-    (newH, addr) = hAlloc h (NGlobal a (compileFn f))
+    (newH, addr) = hAlloc h (NGlobal a c)
     newM = mInsert m (n, addr)

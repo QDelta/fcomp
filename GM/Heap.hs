@@ -14,8 +14,8 @@ emptyHeap = (emptyMap, [1..])
 hAlloc :: Heap a -> a -> (Heap a, Addr)
 hAlloc (m, a : r) n = ((mInsert m (a, n), r), a)
 
-hLookUp :: Heap a -> Addr -> a
-hLookUp (m, _) = mLookup m
+hLookup :: Heap a -> Addr -> a
+hLookup (m, _) = mLookup m
 
 hUpdate :: Heap a -> (Addr, a) -> Heap a
 hUpdate (m, r) p = (mInsert m p, r)

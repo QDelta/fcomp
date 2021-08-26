@@ -12,13 +12,21 @@ type TypeEnv = (FNameMap, CNameMap, TNameMap) -- function, constructor, type
 type LNameMap = Map String Int
 
 primFunc :: FNameMap
-primFunc = emptyMap
+primFunc = 
+  mFromList 
+    [ ("+", FnT IntT (FnT IntT IntT)),
+      ("-", FnT IntT (FnT IntT IntT)),
+      ("*", FnT IntT (FnT IntT IntT))
+    ]
 
 primConstr :: CNameMap
 primConstr = emptyMap 
 
 primType :: TNameMap
-primType = emptyMap
+primType = 
+  mFromList
+    [ ("Int", IntT)
+    ]
 
 initialTypeEnv :: TypeEnv
 initialTypeEnv = (primFunc, primConstr, primType)
@@ -77,6 +85,7 @@ paramBind1 (fNM, fType) name = case fType of
   _ -> error "Type Error: Fn"
 
 genCoreExpr :: [CoreConstr] -> LNameMap -> Expr -> CoreExpr
+genCoreExpr _ _ (IntLitE n) = IntCE n
 genCoreExpr _ lNM (VarE name) = 
   case mLookupMaybe lNM name of
     Just i -> LVarCE i
@@ -100,6 +109,7 @@ genCoreBranch cCons lNM (name : binds, e) = (arity, tag, ce)
 
 typeCheckExpr :: CNameMap -> FNameMap -> Expr -> Type
 typeCheckExpr cNM fNM expr = case expr of
+  IntLitE _ -> IntT
   VarE name -> case mLookupMaybe fNM name of
     Just t -> t
     Nothing -> mLookup cNM name

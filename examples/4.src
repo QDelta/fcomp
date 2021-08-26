@@ -1,0 +1,28 @@
+(data IntList Nil (Cons Int IntList))
+
+(: len (-> IntList Int))
+(def (len l)
+  (case l
+    (Nil 0)
+    ((Cons h t) (+ 1 (len t)))))
+
+(: concat (-> IntList IntList IntList))
+(def (concat l1 l2)
+  (case l1
+    (Nil l2)
+    ((Cons h t) (Cons h (concat t l2)))))
+
+(: foo Int)
+(def foo
+  (len 
+    (concat 
+      (Cons 0 (Cons 1 Nil))
+      (Cons (+ 2 1) Nil))))
+
+(: bar Int)
+(def bar
+  (len 
+    (Cons 2 (Cons 4 Nil))))
+
+(: main Int)
+(def main (+ foo bar))

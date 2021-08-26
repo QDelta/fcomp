@@ -9,6 +9,7 @@ type TypeDecl = (String, TypeSig)
 
 data Expr
   = VarE String
+  | IntLitE Int
   | ApE Expr Expr
   | CaseE Expr [Branch]
   deriving (Show)

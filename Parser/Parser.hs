@@ -7,6 +7,7 @@ data Token
   | DefKW  | DataKW | CaseKW
   | Colon  | Arrow
   | NameTok String
+  | IntTok Int
   deriving (Show, Eq)
 
 tlex :: String -> [Token]
@@ -17,13 +18,24 @@ tlex s = case s of
     | c == '('  -> LParen : tlex cs
     | c == ')'  -> RParen : tlex cs
     | c == ':'  -> Colon  : tlex cs
+    | isDigit c -> let (n, rest) = intLex  c cs in n : tlex rest
     | otherwise -> let (n, rest) = nameLex c cs in n : tlex rest
 
 isSpace :: Char -> Bool
-isSpace c = c `elem` " \t\r\n"
+isSpace = (`elem` " \t\r\n")
+
+isDigit :: Char -> Bool
+isDigit = (`elem` "0123456789")
 
 isNameChar :: Char -> Bool
 isNameChar c = not (isSpace c || c `elem` ":()")
+
+intLex :: Char -> String -> (Token, String)
+intLex c cs = (ti, rest)
+  where
+    istr = c : istr'
+    (istr', rest) = span isDigit cs
+    ti = IntTok (read istr)
 
 nameLex :: Char -> String -> (Token, String)
 nameLex c cs = (tn, rest)
@@ -132,6 +144,7 @@ pTypeDecl = pseq pName pTypeSig
 
 pExpr :: Parser Expr
 pExpr ts = case ts of
+  IntTok n : rest -> Just (IntLitE n, rest)
   NameTok n : rest -> Just (VarE n, rest)
   LParen : NameTok n : r1 -> 
     case paddRParen (pstar pExpr) r1 of

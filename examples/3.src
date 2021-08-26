@@ -1,0 +1,13 @@
+(data IntList Nil (Cons Int IntList))
+
+(: head (-> IntList Int))
+(def (head l)
+  (case l
+    (Nil 0)
+    ((Cons h t) h)))
+
+(: from (-> Int IntList))
+(def (from n) (Cons n (from (+ 1 n))))
+
+(: main Int)
+(def main (head (from 2)))

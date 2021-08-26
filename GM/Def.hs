@@ -5,6 +5,7 @@ import GM.Heap
 
 data Instruction
   = PushG  String
+  | PushI  Int
   | Push   Int
   | Pop    Int
   | MkApp 
@@ -16,6 +17,7 @@ data Instruction
   | Eval
   | Alloc  Int
   | Unwind
+  | Add | Sub | Mul
   deriving (Show)
 
 data Node
@@ -23,6 +25,7 @@ data Node
   | NGlobal Int Code
   | NInd Addr
   | NData Int [Addr]
+  | NInt Int
   deriving (Show)
 
 type Code = [Instruction]
