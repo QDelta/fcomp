@@ -1,22 +1,8 @@
 module GM.Exec where
 
 import Utils
-import GM.Inst
 import GM.Heap
-
-data Node
-  = NApp Addr Addr
-  | NGlobal Int Code
-  | NInd Addr
-  | NData Int [Addr]
-  deriving (Show)
-
-type Code = [Instruction]
-type GlobalMap = Map String Addr
-type Stack = [Addr]
-type Dump = [(Code, Stack)]
-
-type State = (Code, Stack, Dump, Heap Node, GlobalMap)
+import GM.Def
 
 step :: Instruction -> State -> State
 
@@ -32,16 +18,16 @@ step MkApp (i, a0 : a1 : s, d, h, m) =
 
 step Unwind (i, a : s, d, h, m) =
   case hLookUp h a of
-    NApp a0 _   -> (Unwind : i, a0 : a : s, d,     h, m)
-    NInd a'     -> (Unwind : i, a' : s,     d,     h, m)
+    NApp a0 _   -> (Unwind : i, a0 : a : s, d, h, m)
+    NInd a'     -> (Unwind : i,     a' : s, d, h, m)
     NGlobal n c 
-      | length s >= n -> (c, args ++ drop n (a : s), d, h, m)
+      | length s >= n -> (c ++ Unwind : i, args ++ drop n (a : s), d, h, m)
       | otherwise -> (prevI, last (a : s) : prevS, prevD, h, m)
       where 
         (prevI, prevS) : prevD = d
         args = map (getArg . hLookUp h) s
         getArg (NApp _ a1) = a1
-    NData _ _   -> (prevI,      a  : prevS, prevD, h, m)
+    _ -> (prevI, a : prevS, prevD, h, m)
       where (prevI, prevS) : prevD = d
 
 step (Update n) (i, a : s, d, h, m) =
@@ -82,9 +68,14 @@ run :: State -> State
 run (i : is, s, d, h, m) = run $ step i (is, s, d, h, m)
 run state@([], _, _, _, _) = state
 
+runWithLog :: State -> [String]
+runWithLog state@(i : is, s, d, h, m) = showState state : runWithLog (step i (is, s, d, h, m))
+runWithLog state@([], _, _, _, _) = [showState state]
+
 showState :: State -> String
 showState (i, s, d, h, m) =
   "Code: " ++ show i ++ "\n" ++
   "Stack: " ++ show s ++ "\n" ++
   "Dump: " ++ show d ++ "\n" ++
-  "Heap: " ++ hShow h ++ "\n"
+  "Heap: \n" ++ hShow h ++ "\n" ++
+  "GlobalMap: \n" ++ mShow m ++ "\n"

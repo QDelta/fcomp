@@ -20,14 +20,20 @@ mInsert = flip (:)
 mFromList :: [(k, v)] -> Map k v
 mFromList l = l
 
-mDrop :: Int -> Map k v -> Map k v
-mDrop = drop
+mToList :: Map k v -> [(k, v)]
+mToList l = l
+
+-- mDrop :: Int -> Map k v -> Map k v
+-- mDrop = drop
 
 mCount :: Map k v -> Int 
 mCount = length
 
 emptyMap :: Map k v
 emptyMap = []
+
+mShow :: (Show k, Show v) => Map k v -> String
+mShow = concat . interleave "\n" . map show
 
 first :: (a -> c) -> (a, b) -> (c, b)
 first f (x, y) = (f x, y)
@@ -41,3 +47,7 @@ mapAccumL f acc (x : xs) = (acc2, x' : xs')
   where
     (acc1, x') = f acc x
     (acc2, xs') = mapAccumL f acc1 xs
+
+interleave :: a -> [a] -> [a]
+interleave _ [x] = [x]
+interleave x (x1 : xs) = x1 : x : interleave x xs

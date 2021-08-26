@@ -1,0 +1,24 @@
+(data Nat O (S Nat))
+
+(: plus (-> Nat Nat Nat))
+(def (plus m n)
+  (case m
+    (O n)
+    ((S m') (plus m' (S n)))))
+
+(data NatList Nil (Cons Nat NatList))
+
+(: head (-> NatList Nat))
+(def (head l)
+  (case l
+    (Nil O)
+    ((Cons h t) h)))
+
+(: one Nat)
+(def one (S O))
+
+(: ones NatList)
+(def ones (Cons one ones))
+
+(: main Nat)
+(def main (head ones))

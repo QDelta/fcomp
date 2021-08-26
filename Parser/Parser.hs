@@ -1,6 +1,6 @@
-module Parser where
+module Parser.Parser where
 
-import AST
+import Parser.AST
 
 data Token 
   = LParen | RParen
@@ -107,9 +107,10 @@ pConstructor ts = case ts of
 pTypeSig :: Parser TypeSig
 pTypeSig ts = case ts of
   NameTok n : rest -> Just (AtomTS n, rest)
-  LParen : Arrow : r1 -> case paddRParen (pplus pTypeSig) r1 of
-    Just (ts, rest) -> Just (multiArrowTS ts, rest)
-    _ -> Nothing 
+  LParen : Arrow : r1 -> 
+    case paddRParen (pplus pTypeSig) r1 of
+      Just (ts, rest) -> Just (multiArrowTS ts, rest)
+      _ -> Nothing 
   _ -> Nothing
 
 multiArrowTS :: [TypeSig] -> TypeSig
@@ -132,12 +133,14 @@ pTypeDecl = pseq pName pTypeSig
 pExpr :: Parser Expr
 pExpr ts = case ts of
   NameTok n : rest -> Just (VarE n, rest)
-  LParen : NameTok n : r1 -> case paddRParen (pstar pExpr) r1 of
-    Just (es, rest) -> Just (foldl ApE (VarE n) es, rest)
-    Nothing -> error "pstar in pExpr returns Nothing"
-  LParen : CaseKW : r1 -> case paddRParen (pseq pExpr (pplus pBranch)) r1 of
-    Just ((e, bs), rest) -> Just (CaseE e bs, rest)
-    Nothing -> Nothing
+  LParen : NameTok n : r1 -> 
+    case paddRParen (pstar pExpr) r1 of
+      Just (es, rest) -> Just (foldl ApE (VarE n) es, rest)
+      Nothing -> error "pstar in pExpr returns Nothing"
+  LParen : CaseKW : r1 -> 
+    case paddRParen (pseq pExpr (pplus pBranch)) r1 of
+      Just ((e, bs), rest) -> Just (CaseE e bs, rest)
+      Nothing -> Nothing
   _ -> Nothing
 
 pBranch :: Parser Branch
