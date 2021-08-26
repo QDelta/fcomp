@@ -61,8 +61,10 @@ type CompiledCoreFn = (String, Int, Code)
 
 compileFn :: CoreFn -> CompiledCoreFn
 compileFn (name, arity, body) =
- (name, arity, bCode ++ [Slide (arity + 1)])
-  where bCode = compileE (initialFrame arity) body
+ (name, arity, bCode ++ cleanCode)
+  where
+    bCode = compileE (initialFrame arity) body
+    cleanCode = if arity == 0 then [Update arity, Pop arity] else [Slide (arity + 1)] -- CAF opt
 
 compileConstr :: CoreConstr -> Code
 compileConstr (name, arity, tag) =

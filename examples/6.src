@@ -1,0 +1,8 @@
+(: scomb (-> (-> Int Int Int) (-> Int Int) Int Int))
+(def (scomb x y z) (x z (y z)))
+
+(: kcomb (-> Int Int Int))
+(def (kcomb x y) x)
+
+(: main Int)
+(def main (scomb kcomb kcomb 1))

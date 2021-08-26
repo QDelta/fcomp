@@ -1,0 +1,19 @@
+(data IntList Nil (Cons Int IntList))
+
+(: map (-> (-> Int Int) IntList IntList))
+(def (map f l)
+  (case l
+    (Nil Nil)
+    ((Cons h t) (Cons (f h) t))))
+
+(: ones IntList)
+(def ones (Cons 1 ones))
+
+(: head (-> IntList Int))
+(def (head l)
+  (case l
+    (Nil 0)
+    ((Cons h t) h)))
+
+(: main Int)
+(def main (head (map (+ 2) ones)))
