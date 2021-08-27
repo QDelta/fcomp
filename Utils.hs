@@ -23,6 +23,12 @@ mFromList l = l
 mToList :: Map k v -> [(k, v)]
 mToList l = l
 
+mElem :: Eq k => k -> Map k v -> Bool
+mElem _ [] = False
+mElem k ((k0, _) : m')
+  | k == k0 = True
+  | otherwise = mElem k m'
+
 -- mDrop :: Int -> Map k v -> Map k v
 -- mDrop = drop
 

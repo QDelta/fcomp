@@ -50,11 +50,11 @@ step Unwind (i, a : s, d, h, m) =
     NApp a0 _   -> (Unwind : i, a0 : a : s, d, h, m)
     NInd a'     -> (Unwind : i,     a' : s, d, h, m)
     NGlobal n c 
-      | length s >= n -> (c ++ Unwind : i, args ++ drop n (a : s), d, h, m)
+      | length s >= n -> (c, args ++ drop n (a : s), d, h, m)
       | otherwise -> (prevI, last (a : s) : prevS, prevD, h, m)
       where 
         (prevI, prevS) : prevD = d
-        args = map (getArg . hLookup h) s
+        args = map (getArg . hLookup h) (take n s)
         getArg (NApp _ a1) = a1
     _ -> (prevI, a : prevS, prevD, h, m)
       where (prevI, prevS) : prevD = d

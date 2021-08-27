@@ -1,8 +1,11 @@
-(: scomb (-> (-> Int Int Int) (-> Int Int) Int Int))
-(def (scomb x y z) (x z (y z)))
+(: S (-> (-> Int Int Int) (-> Int Int) Int Int))
+(def (S x y z) (x z (y z)))
 
-(: kcomb (-> Int Int Int))
-(def (kcomb x y) x)
+(: K (-> Int Int Int))
+(def (K x y) x)
+
+(: I (-> Int Int))
+(def I (S K K))
 
 (: main Int)
-(def main (scomb kcomb kcomb 1))
+(def main (+ (+ (I 1) (I 2)) (I 3)))

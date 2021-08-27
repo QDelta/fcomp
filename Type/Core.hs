@@ -8,11 +8,12 @@ data CoreExpr
   | LVarCE Int
   | IntCE  Int
   | AppCE CoreExpr CoreExpr
-  | CaseCE CoreExpr [(Int, Int, CoreExpr)] -- arity, tag, body
+  | CaseCE CoreExpr [CoreBranch]
   deriving (Show)
 
-type CoreConstr = (String, Int, Int)  -- name, arity, tag
-type CoreFn = (String, Int, CoreExpr) -- name, arity, body
+type CoreBranch = (Int, Int, CoreExpr)  -- arity, tag, body
+type CoreConstr = (String, Int, Int)    -- name, arity, tag
+type CoreFn = (String, Int, CoreExpr)   -- name, arity, body
 
 type CoreProgram = ([CoreConstr], [CoreFn])
 

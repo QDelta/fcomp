@@ -33,49 +33,63 @@ getOffset f@(ms, count) n =
     min = getTop ms
     nextOffset = getOffset (popStack f) n
 
-compileE :: Frame -> CoreExpr -> Code
+strictBinOpList :: [(String, Instruction)]
+strictBinOpList =
+  [ ("+", Add),
+    ("-", Sub),
+    ("*", Mul)
+  ]
 
-compileE _ (GVarCE name) = [PushG name]
+strictBinOps :: Map String Instruction
+strictBinOps = mFromList strictBinOpList
 
-compileE _ (IntCE n) = [PushI n]
+compileStrictBinOp :: (String, Instruction) -> CompiledCoreFn
+compileStrictBinOp (name, inst) =
+  (name, 2, [Push 1, Eval, Push 1, Eval, inst, Update 2, Pop 2, Unwind])
 
-compileE f (LVarCE i) = [Push (getOffset f i)]
-
-compileE f (AppCE e1 e2) =
-  right ++ left ++ [MkApp]
-  where
-    right = compileE f e2
-    left = compileE (pushStack f 1) e1
-
-compileE f (CaseCE e brs) = 
-  eCode ++ [Eval, Jump brMap]
-  where
-    eCode = compileE f e
-    brMap = mFromList (map (compileBranch f) brs)
-
-compileBranch :: Frame -> (Int, Int, CoreExpr) -> (Int, Code)
-compileBranch f (arity, tag, body) = (tag, Split : code ++ [Slide arity])
-  where code = compileE (pushStack f arity) body
+compiledBinOps :: [CompiledCoreFn]
+compiledBinOps = map compileStrictBinOp strictBinOpList
 
 type CompiledCoreFn = (String, Int, Code)
 
 compileFn :: CoreFn -> CompiledCoreFn
-compileFn (name, arity, body) =
- (name, arity, bCode ++ cleanCode)
+compileFn (n, a, b) = (n, a, code ++ clean)
   where
-    bCode = compileE (initialFrame arity) body
-    cleanCode = if arity == 0 then [Update arity, Pop arity] else [Slide (arity + 1)] -- CAF opt
+    code = compileWHNF (initialFrame a) b
+    clean = 
+      if a == 0  -- CAF
+      then [Update 0, Unwind]
+      else [Slide (a + 1), Unwind]
+
+compileWHNF :: Frame -> CoreExpr -> Code
+compileWHNF _ (IntCE n) = [PushI n]
+compileWHNF f (CaseCE e brs) = compileWHNF f e ++ [Jump (compileAlts f brs)]
+compileWHNF f (AppCE (AppCE (GVarCE op) e1) e2) | op `mElem` strictBinOps =
+  compileWHNF f e2 ++ compileWHNF (pushStack f 1) e1 ++ [mLookup strictBinOps op]
+compileWHNF f e = compileLazy f e ++ [Eval]
+
+compileLazy :: Frame -> CoreExpr -> Code
+compileLazy _ (GVarCE name) = [PushG name]
+compileLazy f (LVarCE i) = [Push (getOffset f i)]
+compileLazy _ (IntCE n) = [PushI n]
+compileLazy f (AppCE e1 e2) = 
+  compileLazy f e2 ++ compileLazy (pushStack f 1) e1 ++ [MkApp]
+
+compileAlts :: Frame -> [CoreBranch] -> Map Int Code
+compileAlts f brs = foldl mInsert emptyMap (map (compileAlt f) brs)
+
+compileAlt :: Frame -> CoreBranch -> (Int, Code)
+compileAlt f (a, t, b) = (t, code)
+  where
+    code = Split : compileWHNF newF b ++ [Slide a]
+    newF = pushStack f a
 
 compileConstr :: CoreConstr -> Code
 compileConstr (name, arity, tag) =
   replicate arity (Push (arity - 1)) ++ [Pack tag arity]
 
 compiledPrimFn :: [CompiledCoreFn] -- name, arity, code
-compiledPrimFn =
-  [ ("+", 2, [Push 1, Eval, Push 1, Eval, Add, Slide 2]),
-    ("-", 2, [Push 1, Eval, Push 1, Eval, Sub, Slide 2]),
-    ("*", 2, [Push 1, Eval, Push 1, Eval, Mul, Slide 2])
-  ]
+compiledPrimFn = compiledBinOps
 
 initialState :: CoreProgram -> State
 initialState (constrs, fns) = ([PushG "main", Eval], [], [], initialHeap, initialGlobalM)
