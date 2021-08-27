@@ -22,4 +22,5 @@ cabal.project.local~
 .HTF/
 .ghc.environment.*
 .vscode/*
-examples/*.out
+**/*.out
+**/*.exe
