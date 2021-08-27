@@ -29,9 +29,6 @@ mElem k ((k0, _) : m')
   | k == k0 = True
   | otherwise = mElem k m'
 
--- mDrop :: Int -> Map k v -> Map k v
--- mDrop = drop
-
 mCount :: Map k v -> Int 
 mCount = length
 

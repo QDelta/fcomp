@@ -6,9 +6,7 @@
     <typeSig> ::= <name> | "(" "->" <typeSig>+ ")"
       <fnDef> ::= "(" "def" <fnProto> <expr> ")"
     <fnProto> ::= <name> | "(" <name> <name>+ ")"
-       <expr> ::= <name> | "(" <expr>+ ")" | <case>
+       <expr> ::= <num> | <name> | "(" <expr>+ ")" | <case>
        <case> ::= "(" "case" <expr> <branch>+ ")"
      <branch> ::= "(" <pattern> <expr> ")"
     <pattern> ::= <name> | "(" <name>+ ")"
-
-       <name> ::= [^:\(\) ]+

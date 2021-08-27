@@ -12,21 +12,19 @@ type TypeEnv = (FNameMap, CNameMap, TNameMap) -- function, constructor, type
 type LNameMap = Map String Int
 
 primFunc :: FNameMap
-primFunc = 
-  mFromList 
-    [ ("+", FnT IntT (FnT IntT IntT)),
-      ("-", FnT IntT (FnT IntT IntT)),
-      ("*", FnT IntT (FnT IntT IntT))
-    ]
+primFunc = mFromList 
+  [ ("+", FnT IntT (FnT IntT IntT)),
+    ("-", FnT IntT (FnT IntT IntT)),
+    ("*", FnT IntT (FnT IntT IntT))
+  ]
 
 primConstr :: CNameMap
 primConstr = emptyMap 
 
 primType :: TNameMap
-primType = 
-  mFromList
-    [ ("Int", IntT)
-    ]
+primType = mFromList
+  [ ("Int", IntT)
+  ]
 
 initialTypeEnv :: TypeEnv
 initialTypeEnv = (primFunc, primConstr, primType)

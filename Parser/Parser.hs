@@ -1,6 +1,8 @@
 module Parser.Parser where
 
+import Utils
 import Parser.AST
+import Data.Char (ord)
 
 data Token 
   = LParen | RParen
@@ -8,6 +10,7 @@ data Token
   | Colon  | Arrow
   | NameTok String
   | IntTok Int
+  | CharTok Char
   deriving (Show, Eq)
 
 tlex :: String -> [Token]
@@ -18,6 +21,7 @@ tlex s = case s of
     | c == '('  -> LParen : tlex cs
     | c == ')'  -> RParen : tlex cs
     | c == ':'  -> Colon  : tlex cs
+    | c == '\'' -> let (c, rest) = charLex   cs in c : tlex rest
     | isDigit c -> let (n, rest) = intLex  c cs in n : tlex rest
     | otherwise -> let (n, rest) = nameLex c cs in n : tlex rest
 
@@ -49,6 +53,10 @@ nameLex c cs = (tn, rest)
       "->"   -> Arrow
       _      -> NameTok n
 
+charLex :: String -> (Token, String)
+charLex (c : '\'' : rest) = (CharTok c, rest)
+charLex _ = error "Invalid character literal"
+
 type Parser a = [Token] -> Maybe (a, [Token])
 
 pseq :: Parser a -> Parser b -> Parser (a, b)
@@ -59,9 +67,7 @@ pseq pa pb ts = case pa ts of
   Nothing -> Nothing 
 
 pmap :: (a -> b) -> Parser a -> Parser b
-pmap f pa ts = case pa ts of
-  Just (r, rest) -> Just (f r, rest)
-  Nothing -> Nothing
+pmap f pa ts = fmap (first f) (pa ts)
 
 pright :: Parser a -> Parser b -> Parser b
 pright pa pb = pmap snd (pseq pa pb)
@@ -145,6 +151,7 @@ pTypeDecl = pseq pName pTypeSig
 pExpr :: Parser Expr
 pExpr ts = case ts of
   IntTok n : rest -> Just (IntLitE n, rest)
+  CharTok c : rest -> Just (IntLitE (ord c), rest)
   NameTok n : rest -> Just (VarE n, rest)
   LParen : NameTok n : r1 -> 
     case paddRParen (pstar pExpr) r1 of

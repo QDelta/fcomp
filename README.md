@@ -7,13 +7,13 @@ A statically-typed non-strict pure-functional programming language with an S-exp
 - [x] Parser
 - [x] Type checker
 - [x] Compile to some abstract machine code (e.g. G-machine)
-- [x] Intepreter
-- [ ] Garbage collector
+- [x] Interpreter
 - [ ] Compile to C
+- [ ] Garbage collector
 
 ### Features
 
-- [ ] Primitives (Integer, Boolean, Char, ...)
+- [x] Integer Primitives
 - [ ] Let bindings
 - [ ] Pattern guards
 - [ ] Polymorphism

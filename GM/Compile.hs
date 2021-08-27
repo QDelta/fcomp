@@ -61,6 +61,7 @@ compileFn (n, a, b) = (n, a, code ++ clean)
       then [Update 0, Unwind]
       else [Slide (a + 1), Unwind]
 
+-- Simple strict analysis
 compileWHNF :: Frame -> CoreExpr -> Code
 compileWHNF _ (IntCE n) = [PushI n]
 compileWHNF f (CaseCE e brs) = compileWHNF f e ++ [Jump (compileAlts f brs)]
@@ -84,23 +85,31 @@ compileAlt f (a, t, b) = (t, code)
     code = Split : compileWHNF newF b ++ [Slide a]
     newF = pushStack f a
 
-compileConstr :: CoreConstr -> Code
-compileConstr (name, arity, tag) =
-  replicate arity (Push (arity - 1)) ++ [Pack tag arity, Eval, Slide (arity + 1), Unwind]
+type CompiledCoreConstr = (String, Int, Int, Code)
+
+compileConstr :: CoreConstr -> CompiledCoreConstr
+compileConstr (name, arity, tag) = 
+  (name, arity, tag, pushP ++ [Pack tag arity, Eval, Slide (arity + 1), Unwind])
+  where pushP = replicate arity (Push (arity - 1))
 
 compiledPrimFn :: [CompiledCoreFn] -- name, arity, code
 compiledPrimFn = compiledBinOps
 
-initialState :: CoreProgram -> State
-initialState (constrs, fns) = ([PushG "main", Eval], [], [], initialHeap, initialGlobalM)
-  where
-    (heap1, gm1) = foldl allocConstr (emptyHeap, emptyMap) constrs
-    (initialHeap, initialGlobalM) = foldl allocFn (heap1, gm1) (compiledPrimFn ++ map compileFn fns)
+type CompiledCore = ([CompiledCoreConstr], [CompiledCoreFn])
 
-allocConstr :: (Heap Node, GlobalMap) -> CoreConstr -> (Heap Node, GlobalMap)
-allocConstr (h, m) cons@(n, a, t) = (newH, newM)
+compile :: CoreProgram -> CompiledCore
+compile (cs, fs) = (map compileConstr cs, compiledPrimFn ++ map compileFn fs)
+
+initialState :: CompiledCore -> State
+initialState (cs, fs) = ([PushG "main", Eval], [], [], initialHeap, initialGlobalM)
   where
-    (newH, addr) = hAlloc h (NGlobal a (compileConstr cons))
+    (heap1, gm1) = foldl allocConstr (emptyHeap, emptyMap) cs
+    (initialHeap, initialGlobalM) = foldl allocFn (heap1, gm1) fs
+
+allocConstr :: (Heap Node, GlobalMap) -> CompiledCoreConstr -> (Heap Node, GlobalMap)
+allocConstr (h, m) cons@(n, a, t, c) = (newH, newM)
+  where
+    (newH, addr) = hAlloc h (NGlobal a c)
     newM = mInsert m (n, addr)
 
 allocFn :: (Heap Node, GlobalMap) -> CompiledCoreFn -> (Heap Node, GlobalMap)
