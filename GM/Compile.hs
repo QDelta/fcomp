@@ -86,7 +86,7 @@ compileAlt f (a, t, b) = (t, code)
 
 compileConstr :: CoreConstr -> Code
 compileConstr (name, arity, tag) =
-  replicate arity (Push (arity - 1)) ++ [Pack tag arity]
+  replicate arity (Push (arity - 1)) ++ [Pack tag arity, Eval, Slide (arity + 1), Unwind]
 
 compiledPrimFn :: [CompiledCoreFn] -- name, arity, code
 compiledPrimFn = compiledBinOps
