@@ -8,7 +8,7 @@ A statically-typed non-strict pure-functional programming language with an S-exp
 - [x] Type checker
 - [x] Compile to some abstract machine code (e.g. G-machine)
 - [x] Interpreter
-- [ ] Compile to C
+- [x] Compile to C
 - [ ] Garbage collector
 
 ### Features
