@@ -9,34 +9,39 @@ type CCode = String
 
 codeGen :: CompiledCore -> CCode
 codeGen p =
-  "#include \"runtime.h\"\n" ++
-  genInitHeap (mCount m) ++
-  "#include \"runtime.c\"\n" ++
-  concatMap (genFn m) gList ++
-  "void heap_init(void) {\n" ++
-  concatMap assignInitHeap gList ++ "}\n" ++
-  genMain m
+  concatMap (genFn h m) ml ++
+  genInitHeap h ml m
   where 
     (_, _, _, h, m) = initialState p
-    gList = hToList h
+    ml = mToList m
 
-mangle :: Addr -> String
-mangle i = "func" ++ show i
+mangle :: String -> String
+mangle n = case n of
+  "+" -> "ff_1"
+  "-" -> "ff_2"
+  "*" -> "ff_3"
+  _   -> "ff_" ++ n
 
-genFn :: GlobalMap -> (Addr, Node) -> CCode
-genFn m (i, NGlobal arity code) =
-  "void " ++ mangle i ++ "(void) {\n" ++
+genFn :: Heap Node -> GlobalMap -> (String, Addr) -> CCode
+genFn h m (name, a) =
+  "void " ++ mangle name ++ "(void) {\n" ++
   genCode m code ++
   "}\n"
+  where (NGlobal _ code) = hLookup h a
 
-genInitHeap :: Int -> CCode
-genInitHeap n = "node_t init_heap[" ++ show n ++ "];\n"
+genInitHeap :: Heap Node -> [(String, Addr)] -> GlobalMap -> CCode
+genInitHeap h ml m = 
+  "void heap_init(void) {\n" ++
+  "init_heap = malloc(sizeof(node_t) * " ++ show (mCount m) ++ ");\n" ++
+  "main_func_id = " ++ show (mLookup m "main") ++ ";\n" ++
+  concatMap (assignInitHeap h) ml ++ "}\n"
 
-assignInitHeap :: (Addr, Node) -> CCode
-assignInitHeap (i, NGlobal arity code) =
-  "init_heap[" ++ show i ++ "].type = NGlobal;\n" ++
-  "init_heap[" ++ show i ++ "].g_arity = " ++ show arity ++ ";\n" ++
-  "init_heap[" ++ show i ++ "].code = " ++ mangle i ++ ";\n"
+assignInitHeap :: Heap Node -> (String, Addr) -> CCode
+assignInitHeap h (name, a) =
+  "init_heap[" ++ show a ++ "].type = NGlobal;\n" ++
+  "init_heap[" ++ show a ++ "].g_arity = " ++ show arity ++ ";\n" ++
+  "init_heap[" ++ show a ++ "].code = " ++ mangle name ++ ";\n"
+  where (NGlobal arity _) = hLookup h a
 
 genCode :: GlobalMap -> Code -> CCode
 genCode m = concatMap (genInstr m)
@@ -82,20 +87,3 @@ genCase :: GlobalMap -> (Int, [Instruction]) -> CCode
 genCase m (tag, code) =
   "case " ++ show tag ++ ":\n" ++
   genCode m code ++ "break;\n"
-
-genMain :: GlobalMap -> CCode
-genMain m =
-  "int main(void) {\n" ++
-  "heap_init();\n" ++
-  "stack_init();\n" ++
-  genInstr m (PushG "main") ++
-  genInstr m Eval ++
-  printResult ++
-  "return 0;\n}"
-
-printResult :: CCode
-printResult =
-  "switch (STACK_TOP->type) {\n" ++
-  "case NInt:\n" ++
-  "printf(\"%d\\n\", STACK_TOP->intv);\n" ++
-  "default: break;}\n"

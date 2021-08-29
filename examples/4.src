@@ -1,28 +1,11 @@
-(data IntList Nil (Cons Int IntList))
+(: S (-> (-> Int Int Int) (-> Int Int) Int Int))
+(def (S x y z) (x z (y z)))
 
-(: len (-> IntList Int))
-(def (len l)
-  (case l
-    (Nil 0)
-    ((Cons h t) (+ 1 (len t)))))
+(: K (-> Int Int Int))
+(def (K x y) x)
 
-(: concat (-> IntList IntList IntList))
-(def (concat l1 l2)
-  (case l1
-    (Nil l2)
-    ((Cons h t) (Cons h (concat t l2)))))
-
-(: foo Int)
-(def foo
-  (len 
-    (concat 
-      (Cons 0 (Cons 1 Nil))
-      (Cons (+ 2 1) Nil))))
-
-(: bar Int)
-(def bar
-  (len 
-    (Cons 2 (Cons 4 Nil))))
+(: I (-> Int Int))
+(def I (S K K))
 
 (: main Int)
-(def main (+ foo bar))
+(def main (+ (+ (I 1) (I 2)) (I 3)))

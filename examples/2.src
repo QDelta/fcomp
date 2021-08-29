@@ -1,37 +1,28 @@
-(data Nat O (S Nat))
+(data IntList Nil (Cons Int IntList))
 
-(: plus (-> Nat Nat Nat))
-(def (plus m n)
-  (case m
-    (O n)
-    ((S m') (plus m' (S n)))))
-
-(data NatList Nil (Cons Nat NatList))
-
-(: len (-> NatList Nat))
+(: len (-> IntList Int))
 (def (len l)
   (case l
-    (Nil O)
-    ((Cons h t) (S (len t)))))
+    (Nil 0)
+    ((Cons h t) (+ 1 (len t)))))
 
-(: concat (-> NatList NatList NatList))
+(: concat (-> IntList IntList IntList))
 (def (concat l1 l2)
   (case l1
     (Nil l2)
     ((Cons h t) (Cons h (concat t l2)))))
 
-(: one Nat)
-(def one (S O))
-
-(: two Nat)
-(def two (S (S O)))
-
-(: three Nat)
-(def three (S (S (S O))))
-
-(: main Nat)
-(def main 
+(: foo Int)
+(def foo
   (len 
     (concat 
-      (Cons O (Cons one Nil)) 
-      (Cons (plus two one) Nil))))
+      (Cons 0 (Cons 1 Nil))
+      (Cons (+ 2 1) Nil))))
+
+(: bar Int)
+(def bar
+  (len 
+    (Cons 2 (Cons 4 Nil))))
+
+(: main Int)
+(def main (+ foo bar))

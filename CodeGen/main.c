@@ -1,4 +1,34 @@
-#include "runtime.h"
+#include <stddef.h>
+#include <stdlib.h>
+#include <stdio.h>
+
+#define STACK_INIT_SIZE 16
+
+typedef unsigned uint_t;
+
+struct _node;
+typedef struct _node *addr_t;
+
+typedef void (*func_t)(void);
+
+typedef struct _node {
+    enum {NApp, NGlobal, NInd, NData, NInt} type;
+    union {
+        // NApp
+        struct { addr_t left; addr_t right; };
+        // NGlobal
+        struct { uint_t g_arity; func_t code; };
+        // NInd
+        struct { addr_t to; };
+        // NData
+        struct { uint_t tag; uint_t d_arity; addr_t* params; };
+        // NInt
+        struct { int intv; };
+    };
+} node_t;
+
+node_t *init_heap;
+void heap_init();
 
 void free_node(node_t *p) {
     if (p->type == NData) {
@@ -6,8 +36,6 @@ void free_node(node_t *p) {
     }
     free(p);
 }
-
-#define STACK_INIT_SIZE 16
 
 addr_t *stack_arr = NULL;
 size_t stack_bp;
@@ -32,7 +60,7 @@ void stack_free(void) {
 void stack_push(addr_t a) {
     if (stack_sp == stack_cap) {
         stack_cap *= 2;
-        stack_arr = realloc(stack_arr, stack_cap);
+        stack_arr = realloc(stack_arr, stack_cap * sizeof(addr_t));
     }
     stack_arr[stack_sp++] = a;
 }
@@ -174,4 +202,118 @@ void inst_alloc(uint_t n) {
         a->to = NULL;
         stack_push(a);
     }
+}
+
+size_t main_func_id;
+
+int main(void) {
+    heap_init();
+    stack_init();
+    inst_pushg(main_func_id);
+    inst_eval();
+    if (STACK_TOP->type == NInt) {
+        printf("%d\n", STACK_TOP->intv);
+    }
+    return 0;
+}
+void ff_S(void) {
+inst_push(2);
+inst_push(2);
+inst_mkapp();
+inst_push(3);
+inst_push(2);
+inst_mkapp();
+inst_mkapp();
+inst_eval();
+inst_slide(4);
+inst_unwind();
+}
+void ff_K(void) {
+inst_push(0);
+inst_eval();
+inst_slide(3);
+inst_unwind();
+}
+void ff_I(void) {
+inst_pushg(5);
+inst_pushg(5);
+inst_pushg(6);
+inst_mkapp();
+inst_mkapp();
+inst_eval();
+inst_update(0);
+inst_unwind();
+}
+void ff_main(void) {
+inst_pushi(3);
+inst_pushg(4);
+inst_mkapp();
+inst_eval();
+inst_pushi(2);
+inst_pushg(4);
+inst_mkapp();
+inst_eval();
+inst_pushi(1);
+inst_pushg(4);
+inst_mkapp();
+inst_eval();
+inst_add();
+inst_add();
+inst_update(0);
+inst_unwind();
+}
+void ff_3(void) {
+inst_push(1);
+inst_eval();
+inst_push(1);
+inst_eval();
+inst_mul();
+inst_update(2);
+inst_pop(2);
+inst_unwind();
+}
+void ff_2(void) {
+inst_push(1);
+inst_eval();
+inst_push(1);
+inst_eval();
+inst_sub();
+inst_update(2);
+inst_pop(2);
+inst_unwind();
+}
+void ff_1(void) {
+inst_push(1);
+inst_eval();
+inst_push(1);
+inst_eval();
+inst_add();
+inst_update(2);
+inst_pop(2);
+inst_unwind();
+}
+void heap_init(void) {
+init_heap = malloc(sizeof(node_t) * 7);
+main_func_id = 3;
+init_heap[6].type = NGlobal;
+init_heap[6].g_arity = 3;
+init_heap[6].code = ff_S;
+init_heap[5].type = NGlobal;
+init_heap[5].g_arity = 2;
+init_heap[5].code = ff_K;
+init_heap[4].type = NGlobal;
+init_heap[4].g_arity = 0;
+init_heap[4].code = ff_I;
+init_heap[3].type = NGlobal;
+init_heap[3].g_arity = 0;
+init_heap[3].code = ff_main;
+init_heap[2].type = NGlobal;
+init_heap[2].g_arity = 2;
+init_heap[2].code = ff_3;
+init_heap[1].type = NGlobal;
+init_heap[1].g_arity = 2;
+init_heap[1].code = ff_2;
+init_heap[0].type = NGlobal;
+init_heap[0].g_arity = 2;
+init_heap[0].code = ff_1;
 }
