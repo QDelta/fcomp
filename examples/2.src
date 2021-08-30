@@ -25,4 +25,4 @@
     (Cons 2 (Cons 4 Nil))))
 
 (: main Int)
-(def main (+ foo bar))
+(def main (- (+ foo bar) 3))

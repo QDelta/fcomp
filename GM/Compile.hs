@@ -64,23 +64,25 @@ compileFn (n, a, b) = (n, a, code ++ clean)
 -- Simple strict analysis
 compileWHNF :: Frame -> CoreExpr -> Code
 compileWHNF _ (IntCE n) = [PushI n]
-compileWHNF f (CaseCE e brs) = compileWHNF f e ++ [Jump (compileAlts f brs)]
+compileWHNF f (CaseCE e brs) = compileWHNF f e ++ [Jump (compileBranches f brs)]
 compileWHNF f (AppCE (AppCE (GVarCE op) e1) e2) | op `mElem` strictBinOps =
   compileWHNF f e2 ++ compileWHNF (pushStack f 1) e1 ++ [mLookup strictBinOps op]
 compileWHNF f e = compileLazy f e ++ [Eval]
 
+-- TODO: lazy case
 compileLazy :: Frame -> CoreExpr -> Code
 compileLazy _ (GVarCE name) = [PushG name]
 compileLazy f (LVarCE i) = [Push (getOffset f i)]
 compileLazy _ (IntCE n) = [PushI n]
 compileLazy f (AppCE e1 e2) = 
   compileLazy f e2 ++ compileLazy (pushStack f 1) e1 ++ [MkApp]
+compileLazy f (CaseCE e brs) = error "lazy case expressions are not implemented yet, use a function to wrap it."
 
-compileAlts :: Frame -> [CoreBranch] -> Map Int Code
-compileAlts f brs = foldl mInsert emptyMap (map (compileAlt f) brs)
+compileBranches :: Frame -> [CoreBranch] -> Map Int Code
+compileBranches f brs = mFromList (map (compileBranch f) brs)
 
-compileAlt :: Frame -> CoreBranch -> (Int, Code)
-compileAlt f (a, t, b) = (t, code)
+compileBranch :: Frame -> CoreBranch -> (Int, Code)
+compileBranch f (a, t, b) = (t, code)
   where
     code = Split : compileWHNF newF b ++ [Slide a]
     newF = pushStack f a
@@ -89,7 +91,7 @@ type CompiledCoreConstr = (String, Int, Int, Code)
 
 compileConstr :: CoreConstr -> CompiledCoreConstr
 compileConstr (name, arity, tag) = 
-  (name, arity, tag, pushP ++ [Pack tag arity, Eval, Slide (arity + 1), Unwind])
+  (name, arity, tag, pushP ++ [Pack tag arity, Slide (arity + 1), Unwind])
   where pushP = replicate arity (Push (arity - 1))
 
 compiledPrimFn :: [CompiledCoreFn] -- name, arity, code

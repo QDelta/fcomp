@@ -1,0 +1,34 @@
+(data IntList Nil (Cons Int IntList))
+(data ListPair (P IntList IntList))
+
+(: snd (-> ListPair IntList))
+(def (snd p)
+  (case p
+    ((P x y) y)))
+
+(: ones IntList)
+(def ones (Cons 1 ones))
+
+(: zeros IntList)
+(def zeros (Cons 0 zeros))
+
+(: sndHead (-> ListPair Int))
+(def (head p)
+  (case p
+    ((P x y)
+      (case y
+        (Nil 0)
+        ((Cons h t) h)))))
+
+(: f (-> IntList ListPair))
+(def (f l)
+  (P 
+    (case l
+      (Nil zeros)
+      ((Cons h t) ones)) 
+    ones))
+
+(: main Int)
+(def main
+  (head (f (P Nil ones))))
+
