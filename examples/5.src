@@ -13,7 +13,7 @@
 (def zeros (Cons 0 zeros))
 
 (: sndHead (-> ListPair Int))
-(def (head p)
+(def (sndHead p)
   (case p
     ((P x y)
       (case y
@@ -22,13 +22,13 @@
 
 (: f (-> IntList ListPair))
 (def (f l)
-  (P 
+  (P
     (case l
       (Nil zeros)
-      ((Cons h t) ones)) 
+      ((Cons h t) ones))
     ones))
 
 (: main Int)
 (def main
-  (head (f (P Nil ones))))
+  (sndHead (f ones)))
 

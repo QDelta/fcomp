@@ -174,4 +174,140 @@ void inst_unwind(void) {
                     for (int i = 0; i < arity; ++i) {
                         STACK_OFFSET(i) = STACK_OFFSET(i+1)->right;
                     }
-                    a->code
+                    a->code();
+                } else {
+                    stack_sp = stack_bp;
+                    stack_bp = (size_t)STACK_TOP;
+                    STACK_TOP = stack_arr[stack_sp];
+                    return;
+                }
+                break;
+            default:
+                stack_sp = stack_bp;
+                stack_bp = (size_t)STACK_TOP;
+                STACK_TOP = a;
+                return;
+        }
+    }
+}
+
+void inst_pop(uint_t n) {
+    stack_sp -= n;
+}
+
+void inst_alloc(uint_t n) {
+    for (int i = 0; i < n; ++i) {
+        addr_t a = malloc(sizeof(node_t));
+        a->type = NInd;
+        a->to = NULL;
+        stack_push(a);
+    }
+}
+
+size_t main_func_id;
+
+int main(void) {
+    heap_init();
+    stack_init();
+    inst_pushg(main_func_id);
+    inst_eval();
+    if (STACK_TOP->type == NInt) {
+        printf("%d\n", STACK_TOP->intv);
+    }
+    return 0;
+}
+void ff_S(void) {
+inst_push(2);
+inst_push(2);
+inst_mkapp();
+inst_push(3);
+inst_push(2);
+inst_mkapp();
+inst_mkapp();
+inst_eval();
+inst_slide(4);
+}
+void ff_K(void) {
+inst_push(0);
+inst_eval();
+inst_slide(3);
+}
+void ff_I(void) {
+inst_pushg(6);
+inst_pushg(6);
+inst_pushg(7);
+inst_mkapp();
+inst_mkapp();
+inst_eval();
+inst_update(0);
+}
+void ff_temp(void) {
+inst_pushi(2);
+inst_pushg(5);
+inst_mkapp();
+inst_eval();
+inst_update(0);
+}
+void ff_main(void) {
+inst_pushg(4);
+inst_eval();
+inst_pushg(4);
+inst_eval();
+inst_add();
+inst_update(0);
+}
+void ff_3(void) {
+inst_push(1);
+inst_eval();
+inst_push(1);
+inst_eval();
+inst_mul();
+inst_update(2);
+inst_pop(2);
+}
+void ff_2(void) {
+inst_push(1);
+inst_eval();
+inst_push(1);
+inst_eval();
+inst_sub();
+inst_update(2);
+inst_pop(2);
+}
+void ff_1(void) {
+inst_push(1);
+inst_eval();
+inst_push(1);
+inst_eval();
+inst_add();
+inst_update(2);
+inst_pop(2);
+}
+void heap_init(void) {
+init_heap = malloc(sizeof(node_t) * 8);
+main_func_id = 3;
+init_heap[7].type = NGlobal;
+init_heap[7].g_arity = 3;
+init_heap[7].code = ff_S;
+init_heap[6].type = NGlobal;
+init_heap[6].g_arity = 2;
+init_heap[6].code = ff_K;
+init_heap[5].type = NGlobal;
+init_heap[5].g_arity = 0;
+init_heap[5].code = ff_I;
+init_heap[4].type = NGlobal;
+init_heap[4].g_arity = 0;
+init_heap[4].code = ff_temp;
+init_heap[3].type = NGlobal;
+init_heap[3].g_arity = 0;
+init_heap[3].code = ff_main;
+init_heap[2].type = NGlobal;
+init_heap[2].g_arity = 2;
+init_heap[2].code = ff_3;
+init_heap[1].type = NGlobal;
+init_heap[1].g_arity = 2;
+init_heap[1].code = ff_2;
+init_heap[0].type = NGlobal;
+init_heap[0].g_arity = 2;
+init_heap[0].code = ff_1;
+}

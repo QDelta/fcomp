@@ -50,7 +50,7 @@ step Unwind (i, a : s, d, h, m) =
     NApp a0 _   -> (Unwind : i, a0 : a : s, d, h, m)
     NInd a'     -> (Unwind : i,     a' : s, d, h, m)
     NGlobal n c 
-      | length s >= n -> (c, args ++ drop n (a : s), d, h, m)
+      | length s >= n -> (c ++ [Unwind], args ++ drop n (a : s), d, h, m)
       | otherwise -> (prevI, last (a : s) : prevS, prevD, h, m)
       where 
         (prevI, prevS) : prevD = d

@@ -45,7 +45,7 @@ strictBinOps = mFromList strictBinOpList
 
 compileStrictBinOp :: (String, Instruction) -> CompiledCoreFn
 compileStrictBinOp (name, inst) =
-  (name, 2, [Push 1, Eval, Push 1, Eval, inst, Update 2, Pop 2, Unwind])
+  (name, 2, [Push 1, Eval, Push 1, Eval, inst, Update 2, Pop 2])
 
 compiledBinOps :: [CompiledCoreFn]
 compiledBinOps = map compileStrictBinOp strictBinOpList
@@ -58,8 +58,8 @@ compileFn (n, a, b) = (n, a, code ++ clean)
     code = compileWHNF (initialFrame a) b
     clean = 
       if a == 0  -- CAF
-      then [Update 0, Unwind]
-      else [Slide (a + 1), Unwind]
+      then [Update 0]
+      else [Slide (a + 1)]
 
 -- Simple strict analysis
 compileWHNF :: Frame -> CoreExpr -> Code
@@ -91,7 +91,7 @@ type CompiledCoreConstr = (String, Int, Int, Code)
 
 compileConstr :: CoreConstr -> CompiledCoreConstr
 compileConstr (name, arity, tag) = 
-  (name, arity, tag, pushP ++ [Pack tag arity, Slide (arity + 1), Unwind])
+  (name, arity, tag, pushP ++ [Pack tag arity, Slide (arity + 1)])
   where pushP = replicate arity (Push (arity - 1))
 
 compiledPrimFn :: [CompiledCoreFn] -- name, arity, code

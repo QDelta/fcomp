@@ -179,8 +179,9 @@ void inst_unwind(void) {
                     stack_sp = stack_bp;
                     stack_bp = (size_t)STACK_TOP;
                     STACK_TOP = stack_arr[stack_sp];
+                    return;
                 }
-                return;
+                break;
             default:
                 stack_sp = stack_bp;
                 stack_bp = (size_t)STACK_TOP;
