@@ -4,9 +4,13 @@ import Utils
 import GM.Heap
 import GM.Def
 
-assertInt :: Node -> Int
-assertInt (NInt n) = n
-assertInt _ = error "Not int"
+run :: State -> State
+run (i : is, s, d, h, m) = run $ step i (is, s, d, h, m)
+run state@([], _, _, _, _) = state
+
+runWithLog :: State -> [String]
+runWithLog state@(i : is, s, d, h, m) = showState state : runWithLog (step i (is, s, d, h, m))
+runWithLog state@([], _, _, _, _) = [showState state]
 
 step :: Instruction -> State -> State
 
@@ -23,27 +27,6 @@ step (Push offset) (i, s, d, h, m) =
 step MkApp (i, a0 : a1 : s, d, h, m) =
   (i, a : s, d, newH, m)
   where (newH, a) = hAlloc h (NApp a0 a1)
-
-step Add (i, a0 : a1 : s, d, h, m) =
-  (i, a : s, d, newH, m)
-  where
-    n0 = assertInt (hLookup h a0)
-    n1 = assertInt (hLookup h a1)
-    (newH, a) = hAlloc h (NInt (n0 + n1))
-
-step Sub (i, a0 : a1 : s, d, h, m) =
-  (i, a : s, d, newH, m)
-  where
-    n0 = assertInt (hLookup h a0)
-    n1 = assertInt (hLookup h a1)
-    (newH, a) = hAlloc h (NInt (n0 - n1))
-
-step Mul (i, a0 : a1 : s, d, h, m) =
-  (i, a : s, d, newH, m)
-  where
-    n0 = assertInt (hLookup h a0)
-    n1 = assertInt (hLookup h a1)
-    (newH, a) = hAlloc h (NInt (n0 * n1))
 
 step Unwind (i, a : s, d, h, m) =
   case hLookup h a of
@@ -93,13 +76,81 @@ step (Alloc n) (i, s, d, h, m) =
 step (Pop n) (i, s, d, h, m) =
   (i, drop n s, d, h, m)
 
-run :: State -> State
-run (i : is, s, d, h, m) = run $ step i (is, s, d, h, m)
-run state@([], _, _, _, _) = state
+step Add (i, a0 : a1 : s, d, h, m) =
+  (i, a : s, d, newH, m)
+  where
+    NInt n0 = hLookup h a0
+    NInt n1 = hLookup h a1
+    (newH, a) = hAlloc h (NInt (n0 + n1))
 
-runWithLog :: State -> [String]
-runWithLog state@(i : is, s, d, h, m) = showState state : runWithLog (step i (is, s, d, h, m))
-runWithLog state@([], _, _, _, _) = [showState state]
+step Sub (i, a0 : a1 : s, d, h, m) =
+  (i, a : s, d, newH, m)
+  where
+    NInt n0 = hLookup h a0
+    NInt n1 = hLookup h a1
+    (newH, a) = hAlloc h (NInt (n0 - n1))
+
+step Mul (i, a0 : a1 : s, d, h, m) =
+  (i, a : s, d, newH, m)
+  where
+    NInt n0 = hLookup h a0
+    NInt n1 = hLookup h a1
+    (newH, a) = hAlloc h (NInt (n0 * n1))
+
+step Div (i, a0 : a1 : s, d, h, m) =
+  (i, a : s, d, newH, m)
+  where
+    NInt n0 = hLookup h a0
+    NInt n1 = hLookup h a1
+    (newH, a) = hAlloc h (NInt (div n0 n1))
+
+step Rem (i, a0 : a1 : s, d, h, m) =
+  (i, a : s, d, newH, m)
+  where
+    NInt n0 = hLookup h a0
+    NInt n1 = hLookup h a1
+    (newH, a) = hAlloc h (NInt (rem n0 n1))
+
+step IsEq (i, a0 : a1 : s, d, h, m) =
+  (i, a : s, d, newH, m)
+  where
+    NInt n0 = hLookup h a0
+    NInt n1 = hLookup h a1
+    (newH, a) = hAlloc h (NData (if n0 == n1 then 1 else 0) [])
+
+step IsGt (i, a0 : a1 : s, d, h, m) =
+  (i, a : s, d, newH, m)
+  where
+    NInt n0 = hLookup h a0
+    NInt n1 = hLookup h a1
+    (newH, a) = hAlloc h (NData (if n0 > n1 then 1 else 0) [])
+
+step IsLt (i, a0 : a1 : s, d, h, m) =
+  (i, a : s, d, newH, m)
+  where
+    NInt n0 = hLookup h a0
+    NInt n1 = hLookup h a1
+    (newH, a) = hAlloc h (NData (if n0 < n1 then 1 else 0) [])
+
+step And (i, a0 : a1 : s, d, h, m) =
+  (i, a : s, d, newH, m)
+  where
+    NData b0 _ = hLookup h a0
+    NData b1 _ = hLookup h a1
+    (newH, a) = hAlloc h (NData (if b0 == 1 && b1 == 1 then 1 else 0) [])
+
+step Or (i, a0 : a1 : s, d, h, m) =
+  (i, a : s, d, newH, m)
+  where
+    NData b0 _ = hLookup h a0
+    NData b1 _ = hLookup h a1
+    (newH, a) = hAlloc h (NData (if b0 == 1 || b1 == 1 then 1 else 0) [])
+
+step Not (i, a : s, d, h, m) =
+  (i, a' : s, d, newH, m)
+  where
+    NData b _ = hLookup h a
+    (newH, a') = hAlloc h (NData (1 - b) [])
 
 showState :: State -> String
 showState (i, s, d, h, m) =

@@ -37,18 +37,40 @@ strictBinOpList :: [(String, Instruction)]
 strictBinOpList =
   [ ("+", Add),
     ("-", Sub),
-    ("*", Mul)
+    ("*", Mul),
+    ("div", Div),
+    ("rem", Rem),
+    ("=?", IsEq),
+    ("<?", IsLt),
+    (">?", IsGt),
+    ("and", And),
+    ("or", Or)
+  ]
+
+strictUnaryOpList :: [(String, Instruction)]
+strictUnaryOpList =
+  [ ("not", Not)
   ]
 
 strictBinOps :: Map String Instruction
 strictBinOps = mFromList strictBinOpList
 
+strictUnaryOps :: Map String Instruction
+strictUnaryOps = mFromList strictUnaryOpList
+
 compileStrictBinOp :: (String, Instruction) -> CompiledCoreFn
 compileStrictBinOp (name, inst) =
-  (name, 2, [Push 1, Eval, Push 1, Eval, inst, Update 2, Pop 2])
+  (name, 2, [Push 1, Eval, Push 1, Eval, inst, Slide 3])
+
+compileStrictUnaryOp :: (String, Instruction) -> CompiledCoreFn
+compileStrictUnaryOp (name, inst) =
+  (name, 1, [Push 0, Eval, inst, Slide 2])
 
 compiledBinOps :: [CompiledCoreFn]
 compiledBinOps = map compileStrictBinOp strictBinOpList
+
+compiledUnaryOps :: [CompiledCoreFn]
+compiledUnaryOps = map compileStrictUnaryOp strictUnaryOpList
 
 type CompiledCoreFn = (String, Int, Code)
 
@@ -65,6 +87,8 @@ compileFn (n, a, b) = (n, a, code ++ clean)
 compileWHNF :: Frame -> CoreExpr -> Code
 compileWHNF _ (IntCE n) = [PushI n]
 compileWHNF f (CaseCE e brs) = compileWHNF f e ++ [Jump (compileBranches f brs)]
+compileWHNF f (AppCE (GVarCE op) e) | op `mElem` strictUnaryOps =
+  compileWHNF f e ++ [mLookup strictUnaryOps op]
 compileWHNF f (AppCE (AppCE (GVarCE op) e1) e2) | op `mElem` strictBinOps =
   compileWHNF f e2 ++ compileWHNF (pushStack f 1) e1 ++ [mLookup strictBinOps op]
 compileWHNF f e = compileLazy f e ++ [Eval]
@@ -76,7 +100,8 @@ compileLazy f (LVarCE i) = [Push (getOffset f i)]
 compileLazy _ (IntCE n) = [PushI n]
 compileLazy f (AppCE e1 e2) = 
   compileLazy f e2 ++ compileLazy (pushStack f 1) e1 ++ [MkApp]
-compileLazy f (CaseCE e brs) = error "lazy case expressions are not implemented yet, use a function to wrap it."
+compileLazy f (CaseCE e brs) = 
+  error "lazy case expressions are not implemented yet, use a function to wrap it."
 
 compileBranches :: Frame -> [CoreBranch] -> Map Int Code
 compileBranches f brs = mFromList (map (compileBranch f) brs)
@@ -95,7 +120,7 @@ compileConstr (name, arity, tag) =
   where pushP = replicate arity (Push (arity - 1))
 
 compiledPrimFn :: [CompiledCoreFn] -- name, arity, code
-compiledPrimFn = compiledBinOps
+compiledPrimFn = compiledBinOps ++ compiledUnaryOps
 
 type CompiledCore = ([CompiledCoreConstr], [CompiledCoreFn])
 
@@ -103,7 +128,7 @@ compile :: CoreProgram -> CompiledCore
 compile (cs, fs) = (map compileConstr cs, compiledPrimFn ++ map compileFn fs)
 
 initialState :: CompiledCore -> State
-initialState (cs, fs) = ([PushG "main", Eval], [], [], initialHeap, initialGlobalM)
+initialState (cs, fs) = ([PushI 0, PushG "main", MkApp, Eval], [], [], initialHeap, initialGlobalM)
   where
     (heap1, gm1) = foldl allocConstr (emptyHeap, emptyMap) cs
     (initialHeap, initialGlobalM) = foldl allocFn (heap1, gm1) fs

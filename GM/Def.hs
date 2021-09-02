@@ -17,7 +17,9 @@ data Instruction
   | Eval
   | Alloc  Int
   | Unwind
-  | Add | Sub | Mul
+  | Add  | Sub  | Mul  | Div  | Rem
+  | IsEq | IsGt | IsLt
+  | And  | Or   | Not
   deriving (Show)
 
 data Node

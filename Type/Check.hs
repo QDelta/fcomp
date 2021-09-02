@@ -11,26 +11,51 @@ type CNameMap = Map String Type
 type TypeEnv = (FNameMap, CNameMap, TNameMap) -- function, constructor, type
 type LNameMap = Map String Int
 
+boolT :: Type
+boolT = DataT "Bool"
+
+listT :: Type
+listT = DataT "List"
+
 primFunc :: FNameMap
 primFunc = mFromList 
   [ ("+", FnT IntT (FnT IntT IntT)),
     ("-", FnT IntT (FnT IntT IntT)),
-    ("*", FnT IntT (FnT IntT IntT))
+    ("*", FnT IntT (FnT IntT IntT)),
+    ("div", FnT IntT (FnT IntT IntT)),
+    ("rem", FnT IntT (FnT IntT IntT)),
+    ("=?", FnT IntT (FnT IntT boolT)),
+    (">?", FnT IntT (FnT IntT boolT)),
+    ("<?", FnT IntT (FnT IntT boolT)),
+    ("and", FnT boolT (FnT boolT boolT)),
+    ("or", FnT boolT (FnT boolT boolT)),
+    ("not", FnT boolT boolT)
   ]
 
+-- (data Bool False True)
+-- (data List Nil (Cons Int List))
+
 primConstr :: CNameMap
-primConstr = emptyMap 
+primConstr = mFromList
+  [ ("False", boolT),
+    ("True", boolT),
+    ("Nil", listT),
+    ("Cons", FnT IntT (FnT listT listT))
+  ]
 
 primType :: TNameMap
 primType = mFromList
-  [ ("Int", IntT)
+  [ ("Int", IntT),
+    ("List", listT),
+    ("Bool", boolT)
   ]
 
 initialTypeEnv :: TypeEnv
 initialTypeEnv = (primFunc, primConstr, primType)
 
 initialCore :: CoreProgram 
-initialCore = ([], [])
+initialCore = 
+  ([("False", 0, 0), ("True", 0, 1), ("Nil", 0, 0), ("Cons", 2, 1)], [])
 
 typeSigToType :: TNameMap -> TypeSig -> Type
 typeSigToType tNM (AtomTS n) = mLookup tNM n

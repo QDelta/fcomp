@@ -14,10 +14,10 @@ A statically-typed non-strict pure-functional programming language with an S-exp
 ### Features
 
 - [x] Integer Primitives
-- [ ] Let bindings
-- [ ] Pattern guards
-- [ ] Polymorphism
 - [ ] Type inference
+- [ ] Polymorphism
+- [ ] Let bindings
+- [ ] Lambda expressions
 - [ ] Monadic IO
 - [ ] Bootstrapping
 

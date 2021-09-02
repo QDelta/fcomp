@@ -1,8 +1,11 @@
-module Parser.Parser where
+{-# LANGUAGE LambdaCase #-}
+
+module Parser.Parser (parse) where
 
 import Utils
 import Parser.AST
 import Data.Char (ord)
+import Control.Applicative
 
 data Token 
   = LParen | RParen
@@ -32,7 +35,7 @@ isDigit :: Char -> Bool
 isDigit = (`elem` "0123456789")
 
 isNameChar :: Char -> Bool
-isNameChar c = not (isSpace c || c `elem` ":()")
+isNameChar c = not (isSpace c || c `elem` ":()#")
 
 intLex :: Char -> String -> (Token, String)
 intLex c cs = (ti, rest)
@@ -57,118 +60,171 @@ charLex :: String -> (Token, String)
 charLex (c : '\'' : rest) = (CharTok c, rest)
 charLex _ = error "Invalid character literal"
 
-type Parser a = [Token] -> Maybe (a, [Token])
+newtype Parser i o = Parser ([i] -> Maybe (o, [i]))
 
-pseq :: Parser a -> Parser b -> Parser (a, b)
-pseq pa pb ts = case pa ts of
-  Just (ra, resta) -> case pb resta of
-    Just (rb, rest) -> Just ((ra, rb), rest)
-    Nothing -> Nothing 
-  Nothing -> Nothing 
+instance Monad (Parser i) where
+  return a = Parser $ \is -> Just (a, is)
+  (Parser pa) >>= f = Parser $ \is ->
+    case pa is of
+      Just (a, rest) -> pb rest
+        where Parser pb = f a
+      Nothing -> Nothing
 
-pmap :: (a -> b) -> Parser a -> Parser b
-pmap f pa ts = fmap (first f) (pa ts)
+instance Functor (Parser i) where
+  fmap f (Parser p) = Parser (fmap (first f) . p)
 
-pright :: Parser a -> Parser b -> Parser b
-pright pa pb = pmap snd (pseq pa pb)
+instance Applicative (Parser i) where
+  pure = return
+  pab <*> pa = do
+    fab <- pab
+    fab <$> pa
 
-pleft :: Parser a -> Parser b -> Parser a
-pleft pa pb = pmap fst (pseq pa pb)
+instance Alternative (Parser i) where
+  empty = Parser (const Nothing)
+  (Parser p1) <|> (Parser p2) = Parser $ \is ->
+    case p1 is of
+      r@(Just (_, _)) -> r
+      Nothing -> p2 is
 
-paddRParen :: Parser a -> Parser a
-paddRParen p = pleft p (pSym RParen)
+instance MonadFail (Parser i) where
+  fail = error
 
-pParened :: Parser a -> Parser a
-pParened p = pleft (pright (pSym LParen) p) (pSym RParen)
+pitem :: Parser i i
+pitem = Parser $ \case
+  t : ts -> Just (t, ts)
+  [] -> Nothing
 
-pstar :: Parser a -> Parser [a]
-pstar p ts = case p ts of
-  Nothing -> Just ([], ts)
-  Just (r1, ts1) -> case pstar p ts1 of
-    Just (rs, rest) -> Just (r1 : rs, rest)
-    Nothing -> error "pstar returns Nothing" -- Just ([r1], ts1)
+pseq :: Parser i a -> Parser i b -> Parser i (a, b)
+pseq pa pb = do
+  a <- pa
+  b <- pb
+  return (a, b)
 
-pplus :: Parser a -> Parser [a]
-pplus p ts = case pseq p (pstar p) ts of
-  Just ((r1, rs), rest) -> Just (r1 : rs, rest)
-  Nothing -> Nothing
+pleft :: Parser i a -> Parser i b -> Parser i a
+pleft pa pb = fst <$> pseq pa pb
 
-pSym :: Token -> Parser Token
-pSym t (h : rest) 
-  | t == h = Just (h, rest)
-  | otherwise = Nothing
-pSym _ [] = Nothing
+pright :: Parser i a -> Parser i b -> Parser i b
+pright pa pb = snd <$> pseq pa pb
 
-pName :: Parser String
-pName ts = case ts of
+psat :: (i -> Bool) -> Parser i i
+psat f = do
+  x <- pitem
+  if f x then return x else empty
+
+psym :: Eq i => i -> Parser i i
+psym x = psat (== x)
+
+pstar :: Parser i o -> Parser i [o]
+pstar p = pplus p <|> return []
+
+pplus :: Parser i o -> Parser i [o]
+pplus p = do
+  a <- p
+  as <- pstar p
+  return (a : as)
+
+type TParser a = Parser Token a
+
+pLParen :: TParser Token
+pLParen = psym LParen
+
+pRParen :: TParser Token
+pRParen = psym RParen
+
+pparened :: TParser a -> TParser a
+pparened p = do
+  _ <- pLParen
+  a <- p
+  _ <- pRParen
+  return a
+
+pName :: TParser String
+pName = Parser $ \case
   NameTok n : ts -> Just (n, ts)
-  _  -> Nothing 
+  _ -> Nothing
 
-pProgram :: Parser Program
+pProgram :: TParser Program 
 pProgram = pplus pStmt
 
-pStmt :: Parser Statement 
-pStmt ts = case ts of
-  LParen : DataKW : rest -> pmap DataDSTMT (paddRParen pData) rest
-  LParen : DefKW : rest -> pmap FnDSTMT (paddRParen pFn) rest
-  LParen : Colon : rest -> pmap DeclSTMT (paddRParen pTypeDecl) rest
+pStmt :: TParser Statement
+pStmt = pparened $
+  pright (psym DataKW) (DataDSTMT <$> pData) <|>
+  pright (psym DefKW) (FnDSTMT <$> pFn) <|>
+  pright (psym Colon) (DeclSTMT <$> pTypeDecl)
+
+pData :: TParser DataDef
+pData = do
+  n <- pName
+  cs <- pplus pConstructor
+  return (n, cs)
+
+pConstructor :: TParser Constructor
+pConstructor = 
+  (do
+    n <- pName
+    return (n, []))
+  <|> pparened
+  (do
+    n <- pName
+    ts <- pplus pTypeSig
+    return (n, ts))
+
+pTypeSig :: TParser TypeSig
+pTypeSig =
+  AtomTS <$> pName
+  <|> pparened
+  (do
+    _ <- psym Arrow
+    ts <- pplus pTypeSig
+    return (foldl1 ArrowTS ts))
+
+pFn :: TParser FnDef 
+pFn = do
+  name : params <- pPattern
+  body <- pExpr
+  return (name, params, body)
+
+pPattern :: TParser Pattern
+pPattern =
+  (do
+    n <- pName
+    return [n])
+  <|> pparened (pplus pName)
+
+pExpr :: TParser Expr
+pExpr = 
+  IntLitE <$> pInt <|>
+  IntLitE . ord <$> pChar <|>
+  VarE <$> pName 
+  <|> pparened
+  (do
+    _ <- psym CaseKW
+    e <- pExpr
+    brs <- pplus pBranch
+    return (CaseE e brs))
+  <|> pparened
+  (do
+    es <- pplus pExpr
+    return (foldl1 ApE es))
+
+pInt :: TParser Int
+pInt = Parser $ \case
+  IntTok n : rest -> Just (n, rest)
   _ -> Nothing
 
-pData :: Parser DataDef 
-pData = pseq pName (pplus pConstructor)
-
-pConstructor :: Parser Constructor
-pConstructor ts = case ts of
-  NameTok n : rest -> Just ((n, []), rest)
-  _ -> pParened (pseq pName (pplus pTypeSig)) ts
-
-pTypeSig :: Parser TypeSig
-pTypeSig ts = case ts of
-  NameTok n : rest -> Just (AtomTS n, rest)
-  LParen : Arrow : r1 -> 
-    case paddRParen (pplus pTypeSig) r1 of
-      Just (ts, rest) -> Just (multiArrowTS ts, rest)
-      _ -> Nothing 
+pChar :: TParser Char
+pChar = Parser $ \case
+  CharTok c : rest -> Just (c, rest)
   _ -> Nothing
 
-multiArrowTS :: [TypeSig] -> TypeSig
-multiArrowTS [t] = t
-multiArrowTS (t1 : ts) = ArrowTS t1 (multiArrowTS ts)
+pBranch :: TParser Branch 
+pBranch = pparened (pseq pPattern pExpr)
 
-pPattern :: Parser Pattern
-pPattern ts = case ts of
-  NameTok n : rest -> Just ([n], rest)
-  LParen : r1 -> paddRParen (pplus pName) r1
-
-pFn :: Parser FnDef
-pFn ts = case pseq pPattern pExpr ts of
-  Just ((name : params, body), rest) -> Just ((name, params, body), rest)
-  _ -> Nothing
-
-pTypeDecl :: Parser TypeDecl 
+pTypeDecl :: TParser TypeDecl
 pTypeDecl = pseq pName pTypeSig
 
-pExpr :: Parser Expr
-pExpr ts = case ts of
-  IntTok n : rest -> Just (IntLitE n, rest)
-  CharTok c : rest -> Just (IntLitE (ord c), rest)
-  NameTok n : rest -> Just (VarE n, rest)
-  LParen : NameTok n : r1 -> 
-    case paddRParen (pstar pExpr) r1 of
-      Just (es, rest) -> Just (foldl ApE (VarE n) es, rest)
-      Nothing -> error "pstar in pExpr returns Nothing"
-  LParen : CaseKW : r1 -> 
-    case paddRParen (pseq pExpr (pplus pBranch)) r1 of
-      Just ((e, bs), rest) -> Just (CaseE e bs, rest)
-      Nothing -> Nothing
-  _ -> Nothing
-
-pBranch :: Parser Branch
-pBranch ts = case ts of
-  LParen : r1 -> paddRParen (pseq pPattern pExpr) r1
-  _ -> Nothing 
-
 parse :: String -> Program
-parse s = case pProgram (tlex s) of
+parse s = case pp (tlex s) of
   Just (p, []) -> p
   _ -> error "ParseError"
+  where Parser pp = pProgram

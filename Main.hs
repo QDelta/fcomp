@@ -24,5 +24,5 @@ main = do
   template <- readFile templateC 
   let cp = (compile . typeCheckProgram . parse) prog
   writeFile (dstDir ++ "main.c") (template ++ codeGen cp)
-  writeFile (dstDir ++ "run.out") (concat $ interleave "\n" ((runWithLog . initialState) cp))
+  -- writeFile (dstDir ++ "run.out") (concat $ interleave "\n" ((runWithLog . initialState) cp))
   
