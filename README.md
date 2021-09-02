@@ -9,7 +9,7 @@ A statically-typed non-strict pure-functional programming language with an S-exp
 - [x] Compile to some abstract machine code (e.g. G-machine)
 - [x] Interpreter
 - [x] Compile to C
-- [ ] Garbage collector
+- [x] Garbage collector
 
 ### Features
 
@@ -19,6 +19,7 @@ A statically-typed non-strict pure-functional programming language with an S-exp
 - [ ] Let bindings
 - [ ] Lambda expressions
 - [ ] Monadic IO
+- [ ] Optimizations
 - [ ] Bootstrapping
 
 
