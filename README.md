@@ -22,5 +22,13 @@ A statically-typed non-strict pure-functional programming language with an S-exp
 - [ ] Optimizations
 - [ ] Bootstrapping
 
+### Example
+
+```bash
+make
+./Main examples/nprime.src build/main.c
+gcc -O2 build/main.c -o build/main
+echo "64" | build/main
+```
 
 [ref](https://www.microsoft.com/en-us/research/publication/implementing-functional-languages-a-tutorial/)
