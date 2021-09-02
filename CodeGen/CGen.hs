@@ -12,7 +12,7 @@ codeGen p =
   concatMap (genFn newM) nnl ++
   initG
   where 
-    (_, _, _, h, m) = initialState p
+    (_, _, _, h, m) = initialState 0 p
     nnl = genNN (mToList m) h
     (initG, newM) = genInitGlobal nnl
 
@@ -99,10 +99,6 @@ genInstr m IsGt =
   "inst_isgt();\n"
 genInstr m IsLt =
   "inst_islt();\n"
-genInstr m And =
-  "inst_and();\n"
-genInstr m Or =
-  "inst_or();\n"
 genInstr m Not =
   "inst_not();\n"
 genInstr m (Jump brs) =

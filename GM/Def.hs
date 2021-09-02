@@ -19,7 +19,7 @@ data Instruction
   | Unwind
   | Add  | Sub  | Mul  | Div  | Rem
   | IsEq | IsGt | IsLt
-  | And  | Or   | Not
+  | Not
   deriving (Show)
 
 data Node

@@ -1,19 +1,19 @@
-(data IntList Nil (Cons Int IntList))
-
-(: map (-> (-> Int Int) IntList IntList))
+(: map (-> (-> Int Int) List List))
 (def (map f l)
   (case l
     (Nil Nil)
     ((Cons h t) (Cons (f h) t))))
 
-(: ones IntList)
-(def ones (Cons 1 ones))
-
-(: head (-> IntList Int))
+(: head (-> List Int))
 (def (head l)
   (case l
     (Nil 0)
     ((Cons h t) h)))
 
-(: main Int)
-(def main (head (map (+ 2) ones)))
+(: from (-> Int List))
+(def (from n) (Cons n (from (+ 1 n))))
+
+(: main (-> Int List))
+(def (main n) 
+  (Cons (head (map (+ 2) (from 1))) Nil))
+

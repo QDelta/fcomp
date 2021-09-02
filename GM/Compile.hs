@@ -42,9 +42,7 @@ strictBinOpList =
     ("rem", Rem),
     ("=?", IsEq),
     ("<?", IsLt),
-    (">?", IsGt),
-    ("and", And),
-    ("or", Or)
+    (">?", IsGt)
   ]
 
 strictUnaryOpList :: [(String, Instruction)]
@@ -120,15 +118,20 @@ compileConstr (name, arity, tag) =
   where pushP = replicate arity (Push (arity - 1))
 
 compiledPrimFn :: [CompiledCoreFn] -- name, arity, code
-compiledPrimFn = compiledBinOps ++ compiledUnaryOps
+compiledPrimFn = compiledBinOps ++ compiledUnaryOps ++
+  [ ("and", 2, [Push 0, Eval, Jump (mFromList [(0, [Pop 1, Pack 0 0]), (1, [Pop 1, Push 1, Eval])]), Slide 3]),
+    ("or",  2, [Push 0, Eval, Jump (mFromList [(0, [Pop 1, Push 1, Eval]), (1, [Pop 1, Pack 1 0])]), Slide 3])
+  ]
+-- (def (and x y) (case x (False False) (True  y)))
+-- (def (or  x y) (case x (True  True ) (False y)))
 
 type CompiledCore = ([CompiledCoreConstr], [CompiledCoreFn])
 
 compile :: CoreProgram -> CompiledCore
 compile (cs, fs) = (map compileConstr cs, compiledPrimFn ++ map compileFn fs)
 
-initialState :: CompiledCore -> State
-initialState (cs, fs) = ([PushI 0, PushG "main", MkApp, Eval], [], [], initialHeap, initialGlobalM)
+initialState :: Int -> CompiledCore -> State
+initialState n (cs, fs) = ([PushI n, PushG "main", MkApp, Eval], [], [], initialHeap, initialGlobalM)
   where
     (heap1, gm1) = foldl allocConstr (emptyHeap, emptyMap) cs
     (initialHeap, initialGlobalM) = foldl allocFn (heap1, gm1) fs

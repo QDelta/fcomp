@@ -1,12 +1,10 @@
-(data IntList Nil (Cons Int IntList))
-
-(: len (-> IntList Int))
+(: len (-> List Int))
 (def (len l)
   (case l
     (Nil 0)
     ((Cons h t) (+ 1 (len t)))))
 
-(: concat (-> IntList IntList IntList))
+(: concat (-> List List List))
 (def (concat l1 l2)
   (case l1
     (Nil l2)
@@ -14,15 +12,10 @@
 
 (: foo Int)
 (def foo
-  (len 
+  (len
     (concat 
       (Cons 0 (Cons 1 Nil))
       (Cons (+ 2 1) Nil))))
 
-(: bar Int)
-(def bar
-  (len 
-    (Cons 2 (Cons 4 Nil))))
-
-(: main Int)
-(def main (- (+ foo bar) 3))
+(: main (-> Int List))
+(def (main n) (Cons n (Cons (+ foo foo) Nil)))

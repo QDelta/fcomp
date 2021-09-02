@@ -7,8 +7,8 @@
 (: I (-> Int Int))
 (def I (S K K))
 
-(: temp Int)
-(def temp (I 2))
+(: double (-> Int Int))
+(def (double x) (+ x x))
 
-(: main Int)
-(def main (+ temp temp))
+(: main (-> Int List))
+(def (main n) (Cons (double (I n)) Nil))

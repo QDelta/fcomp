@@ -8,8 +8,8 @@ import GM.Compile
 import GM.Exec
 import CodeGen.CGen
 
-runProg :: String -> [String]
-runProg = runWithLog . initialState . compile . typeCheckProgram . parse
+runProg :: Int -> String -> [String]
+runProg n = runWithLog . initialState n . compile . typeCheckProgram . parse
 
 templateC :: FilePath
 templateC = "CodeGen/main_template.c"
@@ -24,5 +24,4 @@ main = do
   template <- readFile templateC 
   let cp = (compile . typeCheckProgram . parse) prog
   writeFile (dstDir ++ "main.c") (template ++ codeGen cp)
-  -- writeFile (dstDir ++ "run.out") (concat $ interleave "\n" ((runWithLog . initialState) cp))
-  
+  -- writeFile (dstDir ++ "run.out") (concat $ interleave "\n" ((runWithLog . initialState 0) cp))

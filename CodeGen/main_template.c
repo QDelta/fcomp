@@ -398,28 +398,6 @@ void inst_islt(void) {
     STACK_TOP = a;
 }
 
-void inst_and(void) {
-    addr_t a0 = STACK_OFFSET(0);
-    addr_t a1 = STACK_OFFSET(1);
-    addr_t a = mem_alloc();
-    mem(a)->type = NData;
-    mem(a)->tag = mem(a0)->tag && mem(a1)->tag ? 1 : 0;
-    mem(a)->params = NULL; mem(a)->d_arity = 0;
-    stack_sp -= 1;
-    STACK_TOP = a;
-}
-
-void inst_or(void) {
-    addr_t a0 = STACK_OFFSET(0);
-    addr_t a1 = STACK_OFFSET(1);
-    addr_t a = mem_alloc();
-    mem(a)->type = NData;
-    mem(a)->tag = mem(a0)->tag || mem(a1)->tag ? 1 : 0;
-    mem(a)->params = NULL; mem(a)->d_arity = 0;
-    stack_sp -= 1;
-    STACK_TOP = a;
-}
-
 void inst_not(void) {
     addr_t a0 = STACK_TOP;
     addr_t a = mem_alloc();
