@@ -168,4 +168,7 @@ typeCheckAllBr eType brTPairs =
     allEqType [] = error "Type Error: No branches"
 
 typeCheckProgram :: Program -> CoreProgram
-typeCheckProgram = snd . foldl typeCheckStmt (initialTypeEnv, initialCore)
+typeCheckProgram prog = cp'
+  where 
+    (te, cp) = foldl typeCheckStmt (initialTypeEnv, initialCore) prog
+    cp' = if length (show te) > 1 then cp else error "" -- just to force typecheck
