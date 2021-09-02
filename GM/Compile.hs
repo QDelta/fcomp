@@ -33,42 +33,36 @@ getOffset f@(ms, count) n =
     min = getTop ms
     nextOffset = getOffset (popStack f) n
 
-strictBinOpList :: [(String, Instruction)]
-strictBinOpList =
-  [ ("+", Add),
-    ("-", Sub),
-    ("*", Mul),
-    ("div", Div),
-    ("rem", Rem),
-    ("=?", IsEq),
-    ("<?", IsLt),
-    (">?", IsGt)
+strictOpList :: [(String, Int, Instruction)]
+strictOpList = 
+  [ ("+",   2, Add ),
+    ("-",   2, Sub ),
+    ("*",   2, Mul ),
+    ("div", 2, Div ),
+    ("rem", 2, Rem ),
+    ("=?",  2, IsEq),
+    ("<?",  2, IsLt),
+    (">?",  2, IsGt),
+    ("not", 1, Not )
   ]
 
-strictUnaryOpList :: [(String, Instruction)]
-strictUnaryOpList =
-  [ ("not", Not)
-  ]
+filterArity :: Int -> [(String, Int, Instruction)] -> [(String, Instruction)]
+filterArity n =
+  map (\(a, b, c) -> (a, c)) . filter (\(a, b, c) -> b == 2)
 
+-- TODO: a general matcher for strict ops
 strictBinOps :: Map String Instruction
-strictBinOps = mFromList strictBinOpList
+strictBinOps = mFromList $ filterArity 2 strictOpList
 
 strictUnaryOps :: Map String Instruction
-strictUnaryOps = mFromList strictUnaryOpList
+strictUnaryOps = mFromList $ filterArity 1 strictOpList
 
-compileStrictBinOp :: (String, Instruction) -> CompiledCoreFn
-compileStrictBinOp (name, inst) =
-  (name, 2, [Push 1, Eval, Push 1, Eval, inst, Slide 3])
+compileStrictOp :: (String, Int, Instruction) -> CompiledCoreFn
+compileStrictOp (name, arity, inst) =
+  (name, arity, concat (replicate arity [Push (arity - 1), Eval]) ++ [inst, Update arity, Pop arity])
 
-compileStrictUnaryOp :: (String, Instruction) -> CompiledCoreFn
-compileStrictUnaryOp (name, inst) =
-  (name, 1, [Push 0, Eval, inst, Slide 2])
-
-compiledBinOps :: [CompiledCoreFn]
-compiledBinOps = map compileStrictBinOp strictBinOpList
-
-compiledUnaryOps :: [CompiledCoreFn]
-compiledUnaryOps = map compileStrictUnaryOp strictUnaryOpList
+compiledStrictOps :: [CompiledCoreFn]
+compiledStrictOps = map compileStrictOp strictOpList
 
 type CompiledCoreFn = (String, Int, Code)
 
@@ -76,10 +70,7 @@ compileFn :: CoreFn -> CompiledCoreFn
 compileFn (n, a, b) = (n, a, code ++ clean)
   where
     code = compileWHNF (initialFrame a) b
-    clean = 
-      if a == 0  -- CAF
-      then [Update 0]
-      else [Slide (a + 1)]
+    clean = [Update a, Pop a]
 
 -- Simple strict analysis
 compileWHNF :: Frame -> CoreExpr -> Code
@@ -114,13 +105,13 @@ type CompiledCoreConstr = (String, Int, Int, Code)
 
 compileConstr :: CoreConstr -> CompiledCoreConstr
 compileConstr (name, arity, tag) = 
-  (name, arity, tag, pushP ++ [Pack tag arity, Slide (arity + 1)])
+  (name, arity, tag, pushP ++ [Pack tag arity, Update arity, Pop arity])
   where pushP = replicate arity (Push (arity - 1))
 
 compiledPrimFn :: [CompiledCoreFn] -- name, arity, code
-compiledPrimFn = compiledBinOps ++ compiledUnaryOps ++
-  [ ("and", 2, [Push 0, Eval, Jump (mFromList [(0, [Pop 1, Pack 0 0]), (1, [Pop 1, Push 1, Eval])]), Slide 3]),
-    ("or",  2, [Push 0, Eval, Jump (mFromList [(0, [Pop 1, Push 1, Eval]), (1, [Pop 1, Pack 1 0])]), Slide 3])
+compiledPrimFn = compiledStrictOps ++
+  [ ("and", 2, [Push 0, Eval, Jump (mFromList [(0, [Pop 1, Pack 0 0]), (1, [Pop 1, Push 1, Eval])]), Update 2, Pop 2]),
+    ("or",  2, [Push 0, Eval, Jump (mFromList [(0, [Pop 1, Push 1, Eval]), (1, [Pop 1, Pack 1 0])]), Update 2, Pop 2])
   ]
 -- (def (and x y) (case x (False False) (True  y)))
 -- (def (or  x y) (case x (True  True ) (False y)))
