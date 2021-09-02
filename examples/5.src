@@ -25,21 +25,11 @@
 (: primes List)
 (def primes (sieve (from 2)))
 
-(: head (-> List Int))
-(def (head l)
-  (case l
-    (Nil 0)
-    ((Cons h t) h)))
-
-(: tail (-> List List))
-(def (tail l)
-  (case l
-    (Nil Nil)
-    ((Cons h t) t)))
-
 (: take (-> Int List List))
 (def (take n l)
-  (ife (=? 0 n) Nil (Cons (head l) (take (- n 1) (tail l)))))
+  (case l
+    (Nil Nil)
+    ((Cons h t) (ife (=? 0 n) Nil (Cons h (take (- n 1) t))))))
 
 (: main (-> Int List))
 (def (main n) (take n primes))

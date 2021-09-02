@@ -3,4 +3,4 @@
 .vscode/
 *.out
 *.exe
-CodeGen/main.c
+build/*

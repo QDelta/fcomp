@@ -11,17 +11,13 @@ import CodeGen.CGen
 runProg :: Int -> String -> [String]
 runProg n = runWithLog . initialState n . compile . typeCheckProgram . parse
 
-templateC :: FilePath
-templateC = "CodeGen/main_template.c"
-
-dstDir :: FilePath 
-dstDir = "CodeGen/"
+template :: FilePath
+template = "template.c"
 
 main :: IO ()
 main = do
-  srcFile : _ <- getArgs 
+  srcFile : dstFile : _ <- getArgs 
   prog <- readFile srcFile
-  template <- readFile templateC 
+  template <- readFile template
   let cp = (compile . typeCheckProgram . parse) prog
-  writeFile (dstDir ++ "main.c") (template ++ codeGen cp)
-  -- writeFile (dstDir ++ "run.out") (concat $ interleave "\n" ((runWithLog . initialState 0) cp))
+  writeFile dstFile (template ++ codeGen cp)
