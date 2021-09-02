@@ -3,11 +3,10 @@
 #include <string.h>
 
 #define STACK_INIT_CAP 16
-#define SLAB_INIT_CAP 64
+#define SLAB_INIT_CAP 128
+#define GC_INIT_THRESHOLD 64
 
-typedef unsigned uint_t;
-
-typedef size_t addr_t;
+typedef long addr_t;
 
 typedef void (*func_t)(void);
 
@@ -17,11 +16,11 @@ typedef struct _node {
         // NApp
         struct { addr_t left; addr_t right; };
         // NGlobal
-        struct { uint_t g_arity; func_t code; };
+        struct { int g_arity; func_t code; };
         // NInd
         struct { addr_t to; };
         // NData
-        struct { uint_t tag; uint_t d_arity; addr_t* params; };
+        struct { int tag; int d_arity; addr_t* params; };
         // NInt
         struct { int intv; };
     };
@@ -41,17 +40,17 @@ void exit_program(void);
 typedef struct {
     enum {Vacant, Occupied} slot_tag;
     union {
-        size_t next_vacant;
+        long next_vacant;
         node_t node;
     };
 } slot_t;
 
 slot_t *slab_arr = NULL;
-size_t slab_first_vacant_id;
-size_t slab_size;
-size_t slab_cap;
-size_t slab_occupied_count;
-size_t slab_gc_threshold;
+long slab_first_vacant_id;
+long slab_size;
+long slab_cap;
+long slab_occupied_count;
+long slab_gc_threshold;
 
 void slab_init(void) {
     slab_arr = malloc(SLAB_INIT_CAP * sizeof(slot_t));
@@ -67,7 +66,7 @@ addr_t slab_alloc(void) {
         slab_gc_threshold = slab_occupied_count * 2;
     }
 
-    size_t new_addr;
+    addr_t new_addr;
 
     if (slab_size == slab_first_vacant_id) {
         if (slab_size == slab_cap) {
@@ -81,7 +80,6 @@ addr_t slab_alloc(void) {
         slot_t v_slot = slab_arr[slab_first_vacant_id];
         new_addr = slab_first_vacant_id;
         slab_first_vacant_id = v_slot.next_vacant;
-        
     }
 
     slab_arr[new_addr].slot_tag = Occupied;
@@ -98,7 +96,7 @@ void slab_free(addr_t a) {
 }
 
 void slab_destroy(void) {
-    for (size_t i = 0; i < slab_size; ++i) {
+    for (long i = 0; i < slab_size; ++i) {
         if (slab_arr[i].slot_tag == Occupied) {
             free_node(slab_arr[i].node);
         }
@@ -117,9 +115,9 @@ addr_t mem_alloc(void) {
 void global_init();
 
 addr_t *stack_arr = NULL;
-size_t stack_bp;
-size_t stack_sp;
-size_t stack_cap;
+long stack_bp;
+long stack_sp;
+long stack_cap;
 
 #define STACK_OFFSET(n) (stack_arr[stack_sp - 1 - (n)])
 #define STACK_TOP (stack_arr[stack_sp - 1])
@@ -160,7 +158,7 @@ void stack_traverse(void (*f)(addr_t)) {
             f(stack_arr[i]);
         }
         sp = bp - 1;
-        bp = (size_t)stack_arr[sp];
+        bp = (long)stack_arr[sp];
     }
     for (long i = sp - 1; i >= 0; --i) {
         f(stack_arr[i]);
@@ -196,7 +194,7 @@ void global_gc(void) {
         }
     }
     stack_traverse(gc_track);
-    for (long i = 0; i < slab_size; --i) {
+    for (long i = slab_size - 1; i >= 0; --i) {
         if (slab_arr[i].slot_tag == Occupied 
             && slab_arr[i].node.type != NGlobal 
             && slab_arr[i].node.gc_tag == UNTRACKED) {
@@ -216,7 +214,7 @@ void inst_pushi(int val) {
     stack_push(a);
 }
 
-void inst_push(uint_t offset) {
+void inst_push(int offset) {
     stack_push(STACK_OFFSET(offset));
 }
 
@@ -230,14 +228,14 @@ void inst_mkapp(void) {
     STACK_TOP = a;
 }
 
-void inst_update(uint_t offset) {
+void inst_update(int offset) {
     addr_t a = STACK_TOP;
     stack_sp -= 1;
     mem(STACK_OFFSET(offset))->type = NInd;
     mem(STACK_OFFSET(offset))->to = a;
 }
 
-void inst_pack(uint_t tag, uint_t arity) {
+void inst_pack(int tag, int arity) {
     addr_t a = mem_alloc();
     mem(a)->type = NData;
     mem(a)->tag = tag; mem(a)->d_arity = arity;
@@ -257,7 +255,7 @@ void inst_split(void) {
     }
 }
 
-void inst_slide(uint_t n) {
+void inst_slide(int n) {
     STACK_OFFSET(n) = STACK_TOP;
     stack_sp -= n;
 }
@@ -275,7 +273,7 @@ void inst_eval(void) {
 void inst_unwind(void) {
     while (1) {
         addr_t a = STACK_TOP;
-        uint_t arity;
+        int arity;
         switch (mem(a)->type) {
             case NApp: stack_push(mem(a)->left); break;
             case NInd: STACK_TOP = mem(a)->to; break;
@@ -288,25 +286,25 @@ void inst_unwind(void) {
                     mem(a)->code();
                 } else {
                     stack_sp = stack_bp;
-                    stack_bp = (size_t)STACK_TOP;
+                    stack_bp = (long)STACK_TOP;
                     STACK_TOP = stack_arr[stack_sp];
                     return;
                 }
                 break;
             default:
                 stack_sp = stack_bp;
-                stack_bp = (size_t)STACK_TOP;
+                stack_bp = (long)STACK_TOP;
                 STACK_TOP = a;
                 return;
         }
     }
 }
 
-void inst_pop(uint_t n) {
+void inst_pop(int n) {
     stack_sp -= n;
 }
 
-void inst_alloc(uint_t n) {
+void inst_alloc(int n) {
     for (int i = 0; i < n; ++i) {
         addr_t a = mem_alloc();
         mem(a)->type = NInd;

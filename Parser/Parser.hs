@@ -176,7 +176,7 @@ pTypeSig =
   (do
     _ <- psym Arrow
     ts <- pplus pTypeSig
-    return (foldl1 ArrowTS ts))
+    return (foldr1 ArrowTS ts))
 
 pFn :: TParser FnDef 
 pFn = do
