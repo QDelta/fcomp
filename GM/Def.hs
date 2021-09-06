@@ -1,8 +1,5 @@
 module GM.Def where
 
-import Utils
-import GM.Heap
-
 data Instruction
   = PushG  String
   | PushI  Int
@@ -12,7 +9,7 @@ data Instruction
   | Update Int
   | Pack   Int Int
   | Split
-  | Jump   (Map Int [Instruction])
+  | Jump   [(Int, [Instruction])]
   | Slide  Int
   | Eval
   | Alloc  Int
@@ -30,9 +27,6 @@ data Node
   | NInt Int
   deriving (Show)
 
+type Addr = Int
 type Code = [Instruction]
-type GlobalMap = Map String Addr
-type Stack = [Addr]
-type Dump = [(Code, Stack)]
-
-type State = (Code, Stack, Dump, Heap Node, GlobalMap)
+type GlobalMap = [(String, Addr)]

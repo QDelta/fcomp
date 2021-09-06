@@ -120,7 +120,7 @@ addr_t mem_alloc(void) {
     return slab_alloc();
 }
 
-void global_init();
+void global_init(void);
 
 addr_t *stack_arr = NULL;
 long stack_bp;

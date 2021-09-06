@@ -1,21 +1,17 @@
-(: len (-> List Int))
 (def (len l)
   (case l
     (Nil 0)
     ((Cons h t) (+ 1 (len t)))))
 
-(: concat (-> List List List))
 (def (concat l1 l2)
   (case l1
     (Nil l2)
     ((Cons h t) (Cons h (concat t l2)))))
 
-(: foo Int)
 (def foo
   (len
     (concat 
       (Cons 0 (Cons 1 Nil))
       (Cons (+ 2 1) Nil))))
 
-(: main (-> Int List))
 (def (main n) (Cons n (Cons (+ foo foo) Nil)))

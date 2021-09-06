@@ -1,12 +1,9 @@
-(: diverge Bool)
 (def diverge (not diverge))
 
-(: b2i (-> Bool Int))
 (def (b2i b)
   (case b
     (False 0)
     (True  1)))
 
-(: main (-> Int List))
 (def (main n)
   (Cons (and False diverge) (Cons (or True diverge) Nil)))

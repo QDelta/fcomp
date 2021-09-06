@@ -3,7 +3,6 @@ module CodeGen.CGen where
 import Utils
 import GM.Compile
 import GM.Def
-import GM.Heap
 
 type CCode = String
 
@@ -12,12 +11,8 @@ codeGen p =
   concatMap (genFn newM) nnl ++
   initG
   where 
-    (_, _, _, h, m) = initialState 0 p
-    nnl = genNN (mToList m) h
+    nnl = initGlobals p
     (initG, newM) = genInitGlobal nnl
-
-genNN :: [(String, Addr)] -> Heap Node -> [(String, Node)]
-genNN m h = map (second (hLookup h)) m
 
 -- TODO: a better mangle function
 mangle :: String -> String
@@ -43,7 +38,7 @@ genInitGlobal nnl = (ccode, m)
       "void global_init(void) {\n" ++
       "addr_t ga;\n" ++
       concatMap allocInitGlobal nnl ++ "}\n"
-    m = mFromList (zip (map fst nnl) [0..])
+    m = zip (map fst nnl) [0..]
 
 allocInitGlobal :: (String, Node) -> CCode
 allocInitGlobal (name, NGlobal arity _) =
@@ -52,15 +47,15 @@ allocInitGlobal (name, NGlobal arity _) =
   "mem(ga)->g_arity = " ++ show arity ++ ";\n" ++
   "mem(ga)->code = " ++ mangle name ++ ";\n" ++
   assignMainAddr
-    where
-      assignMainAddr = if name == "main" then "main_func_addr = ga;\n" else ""
+  where
+    assignMainAddr = if name == "main" then "main_func_addr = ga;\n" else ""
 
 genCode :: GlobalMap -> Code -> CCode
 genCode m = concatMap (genInstr m)
 
 genInstr :: GlobalMap -> Instruction -> CCode
 genInstr m (PushG name) = 
-  "inst_pushg(" ++ show (mLookup m name) ++ ");\n"
+  "inst_pushg(" ++ show (mLookup m name (error "")) ++ ");\n"
 genInstr m (PushI n) =
   "inst_pushi(" ++ show n ++ ");\n"
 genInstr m (Push o) =
@@ -103,7 +98,7 @@ genInstr m Not =
   "inst_not();\n"
 genInstr m (Jump brs) =
   "switch (mem(STACK_TOP)->tag) {\n" ++
-  concatMap (genCase m) (mToList brs) ++
+  concatMap (genCase m) brs ++
   "default: fprintf(stderr, \"Non-exhaustive pattern\"); exit_program();\n" ++
   "};\n"
 

@@ -1,12 +1,9 @@
-(: head (-> List Int))
 (def (head l)
   (case l
     (Nil 0)
     ((Cons h t) h)))
 
-(: from (-> Int List))
 (def (from n) (Cons n (from (+ 1 n))))
 
-(: main (-> Int List))
 (def (main n) 
   (Cons (head (from 1)) Nil))

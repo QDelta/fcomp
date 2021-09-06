@@ -1,35 +1,27 @@
-(: ife (-> Bool List List List))
-(def (ife b x y)
+(def (if b x y)
   (case b
     (False y)
     (True  x)))
 
-(: from (-> Int List))
 (def (from n) (Cons n (from (+ 1 n))))
 
-(: notDivide (-> Int Int Bool))
 (def (notDivide p n) (not (=? 0 (rem n p))))
 
-(: filter (-> (-> Int Bool) List List))
 (def (filter f l)
   (case l
     (Nil Nil)
-    ((Cons h t) (ife (f h) (Cons h (filter f t)) (filter f t)))))
+    ((Cons h t) (if (f h) (Cons h (filter f t)) (filter f t)))))
 
-(: sieve (-> List List))
 (def (sieve l)
   (case l
     (Nil Nil)
     ((Cons p rest) (Cons p (sieve (filter (notDivide p) rest))))))
 
-(: primes List)
 (def primes (sieve (from 2)))
 
-(: take (-> Int List List))
 (def (take n l)
   (case l
     (Nil Nil)
-    ((Cons h t) (ife (=? 0 n) Nil (Cons h (take (- n 1) t))))))
+    ((Cons h t) (if (=? 0 n) Nil (Cons h (take (- n 1) t))))))
 
-(: main (-> Int List))
 (def (main n) (take n primes))

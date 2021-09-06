@@ -1,4 +1,4 @@
-module Type.Core where
+module Type.CoreDef where
 
 -- Core is not strongly typed
 -- typechecker desugars the source and generate core

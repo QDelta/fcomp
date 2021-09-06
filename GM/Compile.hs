@@ -1,9 +1,9 @@
 module GM.Compile where
 
 import Utils
-import Type.Core
+import Type.CoreDef
 import GM.Def
-import GM.Heap
+-- import GM.Heap
 
 type Frame = ([Int], Int)
 -- bindings in stack: (top) $5, $6, $2, $3, $4, $0, $1 (bottom)
@@ -48,14 +48,14 @@ strictOpList =
 
 filterArity :: Int -> [(String, Int, Instruction)] -> [(String, Instruction)]
 filterArity n =
-  map (\(a, b, c) -> (a, c)) . filter (\(a, b, c) -> b == 2)
+  map (\(a, b, c) -> (a, c)) . filter (\(a, b, c) -> b == n)
 
 -- TODO: a general matcher for strict ops
-strictBinOps :: Map String Instruction
-strictBinOps = mFromList $ filterArity 2 strictOpList
+strictBinOps :: [(String, Instruction)]
+strictBinOps = filterArity 2 strictOpList
 
-strictUnaryOps :: Map String Instruction
-strictUnaryOps = mFromList $ filterArity 1 strictOpList
+strictUnaryOps :: [(String, Instruction)]
+strictUnaryOps = filterArity 1 strictOpList
 
 compileStrictOp :: (String, Int, Instruction) -> CompiledCoreFn
 compileStrictOp (name, arity, inst) =
@@ -72,17 +72,17 @@ compileFn (n, a, b) = (n, a, code ++ clean)
     code = compileWHNF (initialFrame a) b
     clean = [Update a, Pop a]
 
--- Simple strict analysis
+-- Simple strictness analysis
 compileWHNF :: Frame -> CoreExpr -> Code
 compileWHNF _ (IntCE n) = [PushI n]
 compileWHNF f (CaseCE e brs) = compileWHNF f e ++ [Jump (compileBranches f brs)]
 compileWHNF f (AppCE (GVarCE op) e) | op `mElem` strictUnaryOps =
-  compileWHNF f e ++ [mLookup strictUnaryOps op]
+  compileWHNF f e ++ [mLookup strictUnaryOps op (error "")]
 compileWHNF f (AppCE (AppCE (GVarCE op) e1) e2) | op `mElem` strictBinOps =
-  compileWHNF f e2 ++ compileWHNF (pushStack f 1) e1 ++ [mLookup strictBinOps op]
+  compileWHNF f e2 ++ compileWHNF (pushStack f 1) e1 ++ [mLookup strictBinOps op (error "")]
 compileWHNF f e = compileLazy f e ++ [Eval]
 
--- TODO: lazy case
+-- TODO: lazy case: generate a function
 compileLazy :: Frame -> CoreExpr -> Code
 compileLazy _ (GVarCE name) = [PushG name]
 compileLazy f (LVarCE i) = [Push (getOffset f i)]
@@ -90,10 +90,10 @@ compileLazy _ (IntCE n) = [PushI n]
 compileLazy f (AppCE e1 e2) = 
   compileLazy f e2 ++ compileLazy (pushStack f 1) e1 ++ [MkApp]
 compileLazy f (CaseCE e brs) = 
-  error "lazy case expressions are not implemented yet, use a function to wrap it."
+  error "case expression in lazy environment are not implemented yet, use a function to wrap it."
 
-compileBranches :: Frame -> [CoreBranch] -> Map Int Code
-compileBranches f brs = mFromList (map (compileBranch f) brs)
+compileBranches :: Frame -> [CoreBranch] -> [(Int, Code)]
+compileBranches f = map (compileBranch f)
 
 compileBranch :: Frame -> CoreBranch -> (Int, Code)
 compileBranch f (a, t, b) = (t, code)
@@ -110,8 +110,8 @@ compileConstr (name, arity, tag) =
 
 compiledPrimFn :: [CompiledCoreFn] -- name, arity, code
 compiledPrimFn = compiledStrictOps ++
-  [ ("and", 2, [Push 0, Eval, Jump (mFromList [(0, [Pop 1, Pack 0 0]), (1, [Pop 1, Push 1, Eval])]), Update 2, Pop 2]),
-    ("or",  2, [Push 0, Eval, Jump (mFromList [(0, [Pop 1, Push 1, Eval]), (1, [Pop 1, Pack 1 0])]), Update 2, Pop 2])
+  [ ("and", 2, [Push 0, Eval, Jump [(0, [Pop 1, Pack 0 0]), (1, [Pop 1, Push 1, Eval])], Update 2, Pop 2]),
+    ("or",  2, [Push 0, Eval, Jump [(0, [Pop 1, Push 1, Eval]), (1, [Pop 1, Pack 1 0])], Update 2, Pop 2])
   ]
 -- (def (and x y) (case x (False False) (True  y)))
 -- (def (or  x y) (case x (True  True ) (False y)))
@@ -121,20 +121,11 @@ type CompiledCore = ([CompiledCoreConstr], [CompiledCoreFn])
 compile :: CoreProgram -> CompiledCore
 compile (cs, fs) = (map compileConstr cs, compiledPrimFn ++ map compileFn fs)
 
-initialState :: Int -> CompiledCore -> State
-initialState n (cs, fs) = ([PushI n, PushG "main", MkApp, Eval], [], [], initialHeap, initialGlobalM)
-  where
-    (heap1, gm1) = foldl allocConstr (emptyHeap, emptyMap) cs
-    (initialHeap, initialGlobalM) = foldl allocFn (heap1, gm1) fs
+initGlobals :: CompiledCore -> [(String, Node)]
+initGlobals (cs, fs) = map initConstr cs ++ map initFn fs
 
-allocConstr :: (Heap Node, GlobalMap) -> CompiledCoreConstr -> (Heap Node, GlobalMap)
-allocConstr (h, m) cons@(n, a, t, c) = (newH, newM)
-  where
-    (newH, addr) = hAlloc h (NGlobal a c)
-    newM = mInsert m (n, addr)
+initConstr :: CompiledCoreConstr -> (String, Node)
+initConstr (n, a, _, c) = (n, NGlobal a c)
 
-allocFn :: (Heap Node, GlobalMap) -> CompiledCoreFn -> (Heap Node, GlobalMap)
-allocFn (h, m) f@(n, a, c) = (newH, newM)
-  where
-    (newH, addr) = hAlloc h (NGlobal a c)
-    newM = mInsert m (n, addr)
+initFn :: CompiledCoreFn -> (String, Node)
+initFn (n, a, c) = (n, NGlobal a c)

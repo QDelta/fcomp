@@ -1,14 +1,9 @@
-(: S (-> (-> Int Int Int) (-> Int Int) Int Int))
 (def (S x y z) (x z (y z)))
 
-(: K (-> Int Int Int))
 (def (K x y) x)
 
-(: I (-> Int Int))
 (def I (S K K))
 
-(: double (-> Int Int))
 (def (double x) (+ x x))
 
-(: main (-> Int List))
 (def (main n) (Cons (double (I n)) Nil))

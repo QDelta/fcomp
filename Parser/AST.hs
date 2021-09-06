@@ -2,29 +2,22 @@ module Parser.AST where
 
 data TypeSig
   = AtomTS String
-  | ArrowTS TypeSig TypeSig
+  | ArrTS TypeSig TypeSig
   deriving (Show)
 
-type TypeDecl = (String, TypeSig)
-
 data Expr
-  = VarE String
-  | IntLitE Int
-  | ApE Expr Expr
+  = IntE Int
+  | VarE String
+  | AppE Expr Expr
   | CaseE Expr [Branch]
   deriving (Show)
 
-type Pattern = [String]
-type Branch = (Pattern, Expr)
+type Branch = ([String], Expr) -- pattern, body
 type Constructor = (String, [TypeSig])
 
-type FnDef = (String, [String], Expr)
-type DataDef = (String, [Constructor])
-
-data Statement
-  = FnDSTMT FnDef
-  | DataDSTMT DataDef
-  | DeclSTMT TypeDecl
+data Definition
+  = FnDef String [String] Expr -- name, params, body
+  | DataDef String [Constructor] -- name, constructors
   deriving (Show)
 
-type Program = [Statement]
+type Program = [Definition]
