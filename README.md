@@ -6,15 +6,15 @@ A statically-typed non-strict pure-functional programming language with an S-exp
 
 - [x] Parser
 - [x] Type checker
-- [x] Compile to some G-machine code
+- [x] Compile to G-machine code
 - [x] Compile to C
 - [x] Garbage collector
 
 ### Features
 
 - [x] Integer Primitives
+- [x] Type inference
 - [ ] Parametric polymorphism
-- [ ] Type inference
 - [ ] Let bindings
 - [ ] Lambda expressions
 - [ ] Ad hoc polymorphism

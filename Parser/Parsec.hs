@@ -11,7 +11,7 @@ module Parser.Parsec
     pplus
   ) where
 
-import Utils
+import Utils.Function
 import Control.Applicative (Alternative(..))
 
 newtype Parser i o = Parser ([i] -> Maybe (o, [i]))

@@ -1,6 +1,6 @@
 module CodeGen.CGen where
 
-import Utils
+import Utils.Map
 import GM.Compile
 import GM.Def
 
@@ -38,7 +38,7 @@ genInitGlobal nnl = (ccode, m)
       "void global_init(void) {\n" ++
       "addr_t ga;\n" ++
       concatMap allocInitGlobal nnl ++ "}\n"
-    m = zip (map fst nnl) [0..]
+    m = mFromList $ zip (map fst nnl) [0..]
 
 allocInitGlobal :: (String, Node) -> CCode
 allocInitGlobal (name, NGlobal arity _) =

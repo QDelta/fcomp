@@ -1,34 +1,35 @@
 module Type.Inf where
 
-import Utils
+import Utils.Function
+import Utils.Map
 import Parser.AST
 import Type.Def
 
-type FTMap = [(String, Type)]
-type DTMap = [(String, Type)]
-type CTMap = [(String, Type)]
-type VTMap = [(Int, Type)]
+type FTMap = Map String Type
+type DTMap = Map String Type
+type CTMap = Map String Type
+type VTMap = Map Int Type
 
-data TypeEnv = TypeEnv
+data NameEnv = NameEnv
   { fm :: FTMap,  -- functions
     dm :: DTMap,  -- data types
-    cm :: CTMap,  -- constructors
-    vm :: VTMap,  -- type variables
-    cnt :: Int    -- unique id
+    cm :: CTMap   -- constructors
   }
+
+data InferEnv = InferEnv
+  { vm :: VTMap,  -- type variables
+    cnt :: Int    -- unique id generator
+  }
+
+type TypeEnv = (NameEnv, InferEnv)
 
 -- TODO: state monad
 
-newType :: TypeEnv -> (Type, TypeEnv)
+newType :: InferEnv -> (Type, InferEnv)
 newType env = (VarT id, env {cnt = id + 1})
   where id = cnt env
 
-newArrType :: TypeEnv -> (Type, TypeEnv)
-newArrType env = 
-  (ArrT (VarT id) (VarT $ id + 1), env {cnt = id + 2})
-  where id = cnt env
-
-resolve :: TypeEnv -> Type -> Type
+resolve :: InferEnv -> Type -> Type
 resolve env (VarT p) = 
   case mLookupMaybe (vm env) p of
     Just (VarT p) -> resolve env (VarT p)
@@ -36,7 +37,7 @@ resolve env (VarT p) =
     Nothing -> VarT p
 resolve _ t = t
 
-unify :: TypeEnv -> (Type, Type) -> TypeEnv
+unify :: InferEnv -> (Type, Type) -> InferEnv
 unify env (l, r) = 
   case (resolve env l, resolve env r) of
     (VarT lp,    rt        ) -> bindVar env (lp, rt)
@@ -46,50 +47,50 @@ unify env (l, r) =
     (lt,         rt        ) -> 
       if lt == rt then env else error $ "can not unify " ++ show lt ++ " " ++ show rt
 
-bindVar :: TypeEnv -> (Int, Type) -> TypeEnv
+bindVar :: InferEnv -> (Int, Type) -> InferEnv
 bindVar env (p1, VarT p2) | p1 == p2 = env
 bindVar env (p, t) = env {vm = mInsert (vm env) (p, t)}
 
-bindF :: TypeEnv -> (String, Type) -> TypeEnv
+bindF :: NameEnv -> (String, Type) -> NameEnv
 bindF env (name, t) = env {fm = mInsert (fm env) (name, t)}
 
-bindC :: TypeEnv -> (String, Type) -> TypeEnv
+bindC :: NameEnv -> (String, Type) -> NameEnv
 bindC env (name, t) = env {cm = mInsert (cm env) (name, t)}
 
-bindD :: TypeEnv -> (String, Type) -> TypeEnv
+bindD :: NameEnv -> (String, Type) -> NameEnv
 bindD env (name, t) = env {dm = mInsert (dm env) (name, t)}
 
-inferExpr :: TypeEnv -> Expr -> (Type, TypeEnv)
-inferExpr env expr = case expr of
-  IntE _ -> (IntT, env)
-  VarE name -> (t, env)
+inferExpr :: NameEnv -> InferEnv -> Expr -> (Type, InferEnv)
+inferExpr ne ie expr = case expr of
+  IntE _ -> (IntT, ie)
+  VarE name -> (t, ie)
     where 
-      t = mLookup (fm env) name $
-        mLookup (cm env) name (error $ "undefined " ++ name)
-  AppE l r -> (ret, newEnv)
+      t = mLookup (fm ne) name $
+        mLookup (cm ne) name (error $ "undefined " ++ name)
+  AppE l r -> (ret, newIE)
     where
-      (lt, e1) = inferExpr env l
-      (rt, e2) = inferExpr e1 r
-      (ret, e3) = newType e2
-      newEnv = unify e3 (ArrT rt ret, lt)
-  CaseE expr brs -> (brType, newEnv)
+      (lt, ie1) = inferE ie l
+      (rt, ie2) = inferE ie1 r
+      (ret, ie3) = newType ie2
+      newIE = unify ie3 (ArrT rt ret, lt)
+  CaseE expr brs -> (brType, newIE)
     where
-      (eType, e1) = inferExpr env expr
-      (brType, e2) = newType e1
-      (tPairs, e3) = mapAccumL inferBr e2 brs
+      (eType, ie1) = inferE ie expr
+      (brType, ie2) = newType ie1
+      (tPairs, ie3) = mapAccumL (inferBr ne) ie2 brs
       (patTypes, actualBrTs) = unzip tPairs
-      e4 = foldl unify e3 (zip (repeat eType) patTypes)
-      newEnv = foldl unify e4 (zip (repeat brType) actualBrTs)
+      ie4 = foldl unify ie3 (zip (repeat eType) patTypes)
+      newIE = foldl unify ie4 (zip (repeat brType) actualBrTs)
+  where inferE = inferExpr ne
 
 -- (type of pattern, type of body)
-inferBr :: TypeEnv -> ([String], Expr) -> ((Type, Type), TypeEnv)
-inferBr env (constr : params, body) = ((assertDataT pType, bType), newEnv)
+inferBr :: NameEnv -> InferEnv -> ([String], Expr) -> ((Type, Type), InferEnv)
+inferBr ne ie (constr : params, body) = ((assertDataT pType, bType), newIE)
   where
-    consType = mLookup (cm env) constr (error $ "undefined constructor " ++ constr)
+    consType = mLookup (cm ne) constr (error $ "undefined constructor " ++ constr)
     (binds, pType) = paramBind params consType
-    tmpE1 = foldl bindF env binds
-    (bType, tmpE2) = inferExpr tmpE1 body
-    newEnv = env {vm = vm tmpE2, cnt = cnt tmpE2}
+    tmpNE = foldl bindF ne binds
+    (bType, newIE) = inferExpr tmpNE ie body
     assertDataT t@(DataT _) = t
     assertDataT _ = error "invalid pattern"
 
@@ -103,70 +104,73 @@ multiArrT :: Type -> [Type] -> Type
 multiArrT = foldr ArrT
 
 constructDef :: TypeEnv -> Definition -> TypeEnv
-constructDef env (FnDef name params body) = newEnv
+constructDef (ne, ie) (FnDef name params body) = (newNE, newIE)
   where
-    (retType, e1) = newType env
-    (paramTypes, e2) = mapAccumL (\env _ -> newType env) e1 params
+    (retType, ie1) = newType ie
+    (paramTypes, newIE) = mapAccumL (\ie _ -> newType ie) ie1 params
     fType = multiArrT retType paramTypes
-    newEnv = e2 `bindF` (name, fType)
-constructDef env (DataDef name constrs) = newEnv
+    newNE = ne `bindF` (name, fType)
+constructDef (ne, ie) (DataDef name constrs) = (newNE, ie)
   where
-    dataType = DataT name
-    e1 = foldl constructConstr env (zip (repeat dataType) constrs)
-    newEnv = e1 `bindD` (name, dataType)
+    newNE = ne `bindD` (name, DataT name)
 
-constructConstr :: TypeEnv -> (Type, Constructor) -> TypeEnv
-constructConstr env (dType, (name, tss)) = newEnv
-  where
-    cType = multiArrT dType (map (typeSigToType env) tss)
-    newEnv = env `bindC` (name, cType)
-
-typeSigToType :: TypeEnv -> TypeSig -> Type
+typeSigToType :: NameEnv -> TypeSig -> Type
 typeSigToType env (AtomTS name) = mLookup (dm env) name (error $ "undefined type " ++ name)
 typeSigToType env (ArrTS ts1 ts2) = ArrT (typeSigToType env ts1) (typeSigToType env ts2)
 
 inferDef :: TypeEnv -> Definition -> TypeEnv
-inferDef env (DataDef _ _) = env
-inferDef env (FnDef name params body) = newEnv
+inferDef (ne, ie) (DataDef name constrs) = (newNE, ie)
   where
-    fType = mLookup (fm env) name (error $ "can not find type of " ++ name)
+    dType = DataT name
+    newNE = foldl inferConstr ne (zip (repeat dType) constrs)
+inferDef (ne, ie) (FnDef name params body) = (ne, newIE)
+  where
+    fType = mLookup (fm ne) name (error $ "can not find type of " ++ name)
     (binds, retType) = paramBind params fType
-    tmpEnv = foldl bindF env binds
-    (bType, e1) = inferExpr tmpEnv body
-    e2 = unify e1 (retType, bType)
-    newEnv = env {vm = vm e2, cnt = cnt e2}
+    tmpNE = foldl bindF ne binds
+    (bType, ie1) = inferExpr tmpNE ie body
+    newIE = unify ie1 (retType, bType)
+
+inferConstr :: NameEnv -> (Type, Constructor) -> NameEnv
+inferConstr env (dType, (name, tss)) = newEnv
+  where
+    cType = multiArrT dType (map (typeSigToType env) tss)
+    newEnv = env `bindC` (name, cType)
 
 infer :: Program -> String
 infer prog = envStr
   where 
-    e1 = foldl constructDef initialTypeEnv prog
+    e1 = foldl constructDef (initialNameEnv, initialInferEnv) prog
     e2 = foldl inferDef e1 prog
-    envStr = show e2
+    envStr = envShow e2
 
-recResolve :: TypeEnv -> Type -> Type
-recResolve env (VarT p) =
-  case mLookupMaybe (vm env) p of
-    Just (VarT p) -> recResolve env (VarT p)
-    Just t -> t
+recResolve :: InferEnv -> Type -> Type
+recResolve ie (VarT p) =
+  case mLookupMaybe (vm ie) p of
+    Just t -> recResolve ie t
     Nothing -> VarT p
-recResolve env (ArrT t1 t2) = ArrT (recResolve env t1) (recResolve env t2) 
+recResolve ie (ArrT t1 t2) = ArrT (recResolve ie t1) (recResolve ie t2) 
 recResolve _ t = t
 
-resolveMap :: TypeEnv -> [(String, Type)] -> [(String, Type)]
-resolveMap env = map $ second (recResolve env)
+resolveMap :: InferEnv -> Map String Type -> Map String Type
+resolveMap ie = fmap $ recResolve ie
 
-instance Show TypeEnv where
-  show env =
-    "Functions: \n" ++ mShow (resolveMap env (fm env)) ++ "\n\n" ++
-    "Data types: \n" ++ mShow (resolveMap env (dm env)) ++ "\n\n" ++
-    "Constructors: \n" ++ mShow (resolveMap env (cm env)) ++ "\n"
+envShow :: TypeEnv -> String
+envShow (ne, ie) =
+  "Functions: \n" ++ show (resolveMap ie (fm ne)) ++ "\n\n" ++
+  "Data types: \n" ++ show (resolveMap ie (dm ne)) ++ "\n\n" ++
+  "Constructors: \n" ++ show (resolveMap ie (cm ne)) ++ "\n"
 
-initialTypeEnv :: TypeEnv
-initialTypeEnv = TypeEnv
+initialNameEnv :: NameEnv
+initialNameEnv = NameEnv
   { fm = primFn,
     dm = primData,
-    cm = primConstr,
-    vm = [],
+    cm = primConstr
+  }
+
+initialInferEnv :: InferEnv
+initialInferEnv = InferEnv
+  { vm = emptyMap,
     cnt = 0
   }
 
@@ -175,7 +179,7 @@ boolT = DataT "Bool"
 listT = DataT "List"
 
 primFn :: FTMap
-primFn =
+primFn = mFromList
   [ ("+",   ArrT IntT  (ArrT IntT IntT)),
     ("-",   ArrT IntT  (ArrT IntT IntT)),
     ("*",   ArrT IntT  (ArrT IntT IntT)),
@@ -190,14 +194,14 @@ primFn =
   ]
 
 primData :: DTMap
-primData =
+primData = mFromList
   [ ("Int",  IntT),
     ("List", listT),
     ("Bool", boolT)
   ]
 
 primConstr :: CTMap
-primConstr =
+primConstr = mFromList
   [ ("False", boolT),
     ("True",  boolT),
     ("Nil",   listT),

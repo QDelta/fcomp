@@ -1,5 +1,7 @@
 module GM.Def where
 
+import Utils.Map
+
 data Instruction
   = PushG  String
   | PushI  Int
@@ -29,4 +31,4 @@ data Node
 
 type Addr = Int
 type Code = [Instruction]
-type GlobalMap = [(String, Addr)]
+type GlobalMap = Map String Addr

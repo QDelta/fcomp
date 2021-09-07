@@ -1,6 +1,6 @@
 module Type.CoreGen where
 
-import Utils
+import Utils.Map
 import Parser.AST
 import Type.CoreDef
 
@@ -18,7 +18,7 @@ addCoreDef (cCons, cFn) (FnDef name params body) =
   (cCons, (name, length params, cBody) : cFn)
   where
     cBody = genCoreExpr cCons lm body
-    lm = zip params [0..]
+    lm = mFromList $ zip params [0..]
 
 addCoreConstrs :: [Constructor] -> Int -> [CoreConstr] -> [CoreConstr]
 addCoreConstrs [] _ x = x
@@ -26,7 +26,7 @@ addCoreConstrs ((name, tSigs) : rest) tag cCons =
   addCoreConstrs rest (tag + 1) newCCons
   where newCCons = (name, length tSigs, tag) : cCons
 
-type LOffSetMap = [(String, Int)] -- (local var, offset)
+type LOffSetMap = Map String Int -- (local var, offset)
 
 genCoreExpr :: [CoreConstr] -> LOffSetMap -> Expr -> CoreExpr
 genCoreExpr _ _ (IntE n) = IntCE n
@@ -45,7 +45,7 @@ genCoreExpr cCons lm (CaseE e brs) =
 genCoreBranch :: [CoreConstr] -> LOffSetMap -> Branch -> CoreBranch 
 genCoreBranch cCons lm (name : binds, e) = (arity, tag, ce)
   where
-    atMap = map (\(n, a, t) -> (n, (a, t))) cCons
+    atMap = mFromList $ map (\(n, a, t) -> (n, (a, t))) cCons
     (arity, tag) = mLookup atMap name (error $ "can not find constructor " ++ name)
     tmpLM = foldl mInsert lm (zip binds [length lm..])
     ce = genCoreExpr cCons tmpLM e

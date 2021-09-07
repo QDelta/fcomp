@@ -1,0 +1,13 @@
+(data Even Z (OS Odd))
+(data Odd (ES Even))
+
+(def (toIntE n)
+  (case n
+    (Z 0)
+    ((OS m) (+ 1 (toIntO m)))))
+
+(def (toIntO n)
+  (case n
+    ((ES m) (+ 1 (toIntE m)))))
+
+(def (main n) (Cons (toIntO (ES (OS (ES Z)))) (Cons n Nil)))

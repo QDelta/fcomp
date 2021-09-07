@@ -1,9 +1,8 @@
 module GM.Compile where
 
-import Utils
+import Utils.Map
 import Type.CoreDef
 import GM.Def
--- import GM.Heap
 
 type Frame = ([Int], Int)
 -- bindings in stack: (top) $5, $6, $2, $3, $4, $0, $1 (bottom)
@@ -46,15 +45,15 @@ strictOpList =
     ("not", 1, Not )
   ]
 
-filterArity :: Int -> [(String, Int, Instruction)] -> [(String, Instruction)]
+filterArity :: Int -> [(String, Int, Instruction)] -> Map String Instruction
 filterArity n =
-  map (\(a, b, c) -> (a, c)) . filter (\(a, b, c) -> b == n)
+  mFromList . map (\(a, b, c) -> (a, c)) . filter (\(a, b, c) -> b == n)
 
 -- TODO: a general matcher for strict ops
-strictBinOps :: [(String, Instruction)]
+strictBinOps :: Map String Instruction
 strictBinOps = filterArity 2 strictOpList
 
-strictUnaryOps :: [(String, Instruction)]
+strictUnaryOps :: Map String Instruction
 strictUnaryOps = filterArity 1 strictOpList
 
 compileStrictOp :: (String, Int, Instruction) -> CompiledCoreFn

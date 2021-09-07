@@ -2,7 +2,7 @@
 
 module Parser.Parser (parse) where
 
-import Utils
+import Utils.Function
 import Parser.AST
 import Parser.Parsec
 import Data.Char (ord)
