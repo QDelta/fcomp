@@ -2,6 +2,7 @@ module Main where
 
 import System.Environment (getArgs)
 import Parser.Parser
+import Type.Inf
 import Type.CoreGen
 import GM.Compile
 import CodeGen.CGen
@@ -12,7 +13,9 @@ template = "template.c"
 main :: IO ()
 main = do
   srcFile : dstFile : _ <- getArgs 
-  prog <- readFile srcFile
+  progText <- readFile srcFile
   template <- readFile template
-  let code = (codeGen . compile . genCore . parse) prog
+  let prog = parse progText
+  let code = (codeGen . compile . genCore) prog
+  putStrLn (infer prog)
   writeFile dstFile (template ++ code)

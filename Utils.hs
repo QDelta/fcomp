@@ -37,14 +37,15 @@ first f (x, y) = (f x, y)
 second :: (b -> c) -> (a, b) -> (a, c)
 second f (x, y) = (x, f y)
 
-mapAccumL :: (a -> b -> (a, c)) -> a -> [b] -> (a, [c])
-mapAccumL f acc [] = (acc, [])
-mapAccumL f acc (x : xs) = (acc2, x' : xs')
+mapAccumL :: (a -> b -> (c, a)) -> a -> [b] -> ([c], a)
+mapAccumL f acc [] = ([], acc)
+mapAccumL f acc (x : xs) = (x' : xs', acc2)
   where
-    (acc1, x') = f acc x
-    (acc2, xs') = mapAccumL f acc1 xs
+    (x', acc1) = f acc x
+    (xs', acc2) = mapAccumL f acc1 xs
 
 interleave :: a -> [a] -> [a]
+interleave _ [] = []
 interleave _ [x] = [x]
 interleave x (x1 : xs) = x1 : x : interleave x xs
 
