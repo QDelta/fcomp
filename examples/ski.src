@@ -1,0 +1,5 @@
+S x y z = x z (y z);
+K x y = x;
+I = S K K;
+
+main n = Cons (I n) Nil;

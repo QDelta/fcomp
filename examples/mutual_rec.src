@@ -1,13 +1,12 @@
-(data Even Z (OS Odd))
-(data Odd (ES Even))
+data Even = { Z, OS Odd }
+data Odd = { ES Even }
 
-(def (toIntE n)
-  (case n
-    (Z 0)
-    ((OS m) (+ 1 (toIntO m)))))
+toIntE n = case n of
+  { Z -> 0
+  , OS m -> add 1 (toIntO m)
+  };
 
-(def (toIntO n)
-  (case n
-    ((ES m) (+ 1 (toIntE m)))))
+toIntO n = case n of { ES m -> add 1 (toIntE m) };
 
-(def (main n) (Cons (toIntO (ES (OS (ES Z)))) (Cons n Nil)))
+-- [3, n]
+main n = Cons (toIntO (ES (OS (ES Z)))) (Cons n Nil);

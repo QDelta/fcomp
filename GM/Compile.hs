@@ -32,16 +32,16 @@ getOffset f@(ms, count) n =
     min = getTop ms
     nextOffset = getOffset (popStack f) n
 
-strictOpList :: [(String, Int, Instruction)]
-strictOpList = 
-  [ ("+",   2, Add ),
-    ("-",   2, Sub ),
-    ("*",   2, Mul ),
+strictFnList :: [(String, Int, Instruction)]
+strictFnList = 
+  [ ("add", 2, Add ),
+    ("sub", 2, Sub ),
+    ("mul", 2, Mul ),
     ("div", 2, Div ),
     ("rem", 2, Rem ),
-    ("=?",  2, IsEq),
-    ("<?",  2, IsLt),
-    (">?",  2, IsGt),
+    ("eq",  2, IsEq),
+    ("lt",  2, IsLt),
+    ("gt",  2, IsGt),
     ("not", 1, Not )
   ]
 
@@ -50,18 +50,18 @@ filterArity n =
   mFromList . map (\(a, b, c) -> (a, c)) . filter (\(a, b, c) -> b == n)
 
 -- TODO: a general matcher for strict ops
-strictBinOps :: Map String Instruction
-strictBinOps = filterArity 2 strictOpList
+strictBinFns :: Map String Instruction
+strictBinFns = filterArity 2 strictFnList
 
-strictUnaryOps :: Map String Instruction
-strictUnaryOps = filterArity 1 strictOpList
+strictUnaryFns :: Map String Instruction
+strictUnaryFns = filterArity 1 strictFnList
 
-compileStrictOp :: (String, Int, Instruction) -> CompiledCoreFn
-compileStrictOp (name, arity, inst) =
+compileStrictFn :: (String, Int, Instruction) -> CompiledCoreFn
+compileStrictFn (name, arity, inst) =
   (name, arity, concat (replicate arity [Push (arity - 1), Eval]) ++ [inst, Update arity, Pop arity])
 
-compiledStrictOps :: [CompiledCoreFn]
-compiledStrictOps = map compileStrictOp strictOpList
+compiledStrictFns :: [CompiledCoreFn]
+compiledStrictFns = map compileStrictFn strictFnList
 
 type CompiledCoreFn = (String, Int, Code)
 
@@ -75,10 +75,10 @@ compileFn (n, a, b) = (n, a, code ++ clean)
 compileWHNF :: Frame -> CoreExpr -> Code
 compileWHNF _ (IntCE n) = [PushI n]
 compileWHNF f (CaseCE e brs) = compileWHNF f e ++ [Jump (compileBranches f brs)]
-compileWHNF f (AppCE (GVarCE op) e) | op `mElem` strictUnaryOps =
-  compileWHNF f e ++ [mLookup strictUnaryOps op (error "")]
-compileWHNF f (AppCE (AppCE (GVarCE op) e1) e2) | op `mElem` strictBinOps =
-  compileWHNF f e2 ++ compileWHNF (pushStack f 1) e1 ++ [mLookup strictBinOps op (error "")]
+compileWHNF f (AppCE (GVarCE op) e) | op `mElem` strictUnaryFns =
+  compileWHNF f e ++ [mLookup strictUnaryFns op (error "")]
+compileWHNF f (AppCE (AppCE (GVarCE op) e1) e2) | op `mElem` strictBinFns =
+  compileWHNF f e2 ++ compileWHNF (pushStack f 1) e1 ++ [mLookup strictBinFns op (error "")]
 compileWHNF f e = compileLazy f e ++ [Eval]
 
 -- TODO: lazy case: generate a function
@@ -108,7 +108,7 @@ compileConstr (name, arity, tag) =
   where pushP = replicate arity (Push (arity - 1))
 
 compiledPrimFn :: [CompiledCoreFn] -- name, arity, code
-compiledPrimFn = compiledStrictOps ++
+compiledPrimFn = compiledStrictFns ++
   [ ("and", 2, [Push 0, Eval, Jump [(0, [Pop 1, Pack 0 0]), (1, [Pop 1, Push 1, Eval])], Update 2, Pop 2]),
     ("or",  2, [Push 0, Eval, Jump [(0, [Pop 1, Push 1, Eval]), (1, [Pop 1, Pack 1 0])], Update 2, Pop 2])
   ]

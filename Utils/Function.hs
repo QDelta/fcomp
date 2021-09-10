@@ -19,17 +19,20 @@ interleave _ [x] = [x]
 interleave x (x1 : xs) = x1 : x : interleave x xs
 
 -- insertion sort
-isortBy :: Ord k => (a -> k) -> [a] -> [a]
+isortBy :: (a -> a -> Ordering) -> [a] -> [a]
 isortBy _ [] = []
-isortBy f (x : xs) = ins x (isortBy f xs)
+isortBy cmp (x : xs) = ins x (isortBy cmp xs)
   where
     ins x [] = [x]
     ins x (y : ys)
-      | f x < f y = x : y : ys
-      | otherwise = y : ins x ys
+      | cmp x y == GT = y : ins x ys
+      | otherwise     = x : y : ys
+
+isortWith :: Ord k => (a -> k) -> [a] -> [a]
+isortWith f = isortBy (\x y -> compare (f x) (f y))
 
 isort :: Ord k => [k] -> [k]
-isort = isortBy id
+isort = isortBy compare
 
 -- genUnique :: (Eq k, Ord k) => [k] -> k -> k
 -- genUnique s def = genUniqueFrom sorted (minOrDef sorted def)
@@ -46,3 +49,10 @@ checkUnique = checkUSorted . isort
     checkUSorted [] = True
     checkUSorted [x] = True
     checkUSorted (x : y : l) = x /= y && checkUSorted (y : l)
+
+classify :: (a -> Bool) -> [a] -> ([a], [a])
+classify _ [] = ([], [])
+classify f (x : xs)
+  | f x       = first  (x :) rest
+  | otherwise = second (x :) rest
+  where rest = classify f xs

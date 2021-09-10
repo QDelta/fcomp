@@ -1,9 +1,9 @@
-(def (head l)
-  (case l
-    (Nil 0)
-    ((Cons h t) h)))
+head l = case l of
+  { Nil -> 0
+  , Cons h t -> h
+  };
 
-(def (from n) (Cons n (from (+ 1 n))))
+from n = Cons n (from (add 1 n));
 
-(def (main n) 
-  (Cons (head (from 1)) Nil))
+-- [1]
+main n = Cons (head (from 1)) Nil;

@@ -1,26 +1,26 @@
-(def (if b x y)
-  (case b
-    (False y)
-    (True  x)))
+if b x y = case b of
+  { True  -> x
+  , False -> y
+  };
 
-(def (take n l)
-  (case l
-    (Nil Nil)
-    ((Cons h t) (if (=? 0 n) Nil (Cons h (take (- n 1) t))))))
+take n l = case l of
+  { Nil -> Nil
+  , Cons h t -> if (eq 0 n) Nil (Cons h (take (sub n 1) t))
+  };
 
-(def (zipWith f l1 l2)
-  (case l1
-    (Nil Nil)
-    ((Cons h1 t1) 
-      (case l2
-        (Nil Nil)
-        ((Cons h2 t2) (Cons (f h1 h2) (zipWith f t1 t2)))))))
+zipWith f l1 l2 = case l1 of
+  { Nil -> Nil
+  , Cons h1 t1 -> case l2 of
+      { Nil -> Nil
+      , Cons h2 t2 -> Cons (f h1 h2) (zipWith f t1 t2)
+      }
+  };
 
-(def (tail l)
-  (case l
-    (Nil Nil)
-    ((Cons h t) t)))
+tail l = case l of
+  { Nil -> Nil
+  , Cons h t -> t
+  };
 
-(def fibs (Cons 1 (Cons 1 (zipWith + fibs (tail fibs)))))
+fibs = Cons 1 (Cons 1 (zipWith add fibs (tail fibs)));
 
-(def (main n) (take n fibs))
+main n = take n fibs;

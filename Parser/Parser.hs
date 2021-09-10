@@ -5,15 +5,15 @@ module Parser.Parser (parse) where
 import Utils.Function
 import Parser.AST
 import Parser.Parsec
-import Data.Char (ord)
 
 data Token 
   = LParen | RParen
-  | DefKW  | DataKW | CaseKW
-  | Arrow
+  | LBrace | RBrace
+  | DataKW | CaseKW | OfKW
+  | Arrow  | Colon  | Comma | SemiC | Equal
+  | LineComment
   | NameTok String
   | IntTok Int
-  | CharTok Char
   deriving (Show, Eq)
 
 tlex :: String -> [Token]
@@ -21,11 +21,24 @@ tlex s = case s of
   [] -> []
   c : cs
     | isSpace c -> tlex cs
-    | c == '('  -> LParen : tlex cs
-    | c == ')'  -> RParen : tlex cs
-    | c == '\'' -> let (c, rest) = charLex   cs in c : tlex rest
-    | isDigit c -> let (n, rest) = intLex  c cs in n : tlex rest
-    | otherwise -> let (n, rest) = nameLex c cs in n : tlex rest
+    | isDigit c -> callLex intLex
+    | isAlpha c -> callLex nameLex
+    | otherwise -> callLex symLex
+  where
+    callLex f = toks
+      where 
+        (tok, rest) = f s
+        toks =
+          if tok == LineComment then
+            tlex (skipUntil '\n' rest)
+          else
+            tok : tlex rest
+
+skipUntil :: Char -> String -> String
+skipUntil c [] = []
+skipUntil c (h : t)
+  | h == c    = t
+  | otherwise = skipUntil c t
 
 isSpace :: Char -> Bool
 isSpace = (`elem` " \t\r\n")
@@ -33,31 +46,54 @@ isSpace = (`elem` " \t\r\n")
 isDigit :: Char -> Bool
 isDigit = (`elem` "0123456789")
 
-isNameChar :: Char -> Bool
-isNameChar c = not (isSpace c || c `elem` "()")
+isAlpha :: Char -> Bool
+isAlpha c = ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z')
 
-intLex :: Char -> String -> (Token, String)
-intLex c cs = (ti, rest)
+intLex :: String -> (Token, String)
+intLex s = (ti, rest)
   where
-    istr = c : istr'
-    (istr', rest) = span isDigit cs
+    (istr, rest) = span isDigit s
     ti = IntTok (read istr)
 
-nameLex :: Char -> String -> (Token, String)
-nameLex c cs = (tn, rest)
+nameLex :: String -> (Token, String)
+nameLex s = (tn, rest)
   where 
-    n = c : name'
-    (name', rest) = span isNameChar cs
-    tn = case n of
-      "def"  -> DefKW
+    isNameC c = isAlpha c || isDigit c
+    (name, rest) = span isNameC s
+    tn = case name of
       "data" -> DataKW
       "case" -> CaseKW
-      "->"   -> Arrow
-      _      -> NameTok n
+      "of"   -> OfKW
+      _      -> NameTok name
 
-charLex :: String -> (Token, String)
-charLex (c : '\'' : rest) = (CharTok c, rest)
-charLex _ = error "Invalid character literal"
+symLex :: String -> (Token, String)
+symLex s = symLexFrom s symbols
+  where
+    symLexFrom _ [] = error "Lex error"
+    symLexFrom s ((sym, tok) : ss) =
+      case splitPrefix s sym of
+        Just rest -> (tok, rest)
+        Nothing -> symLexFrom s ss
+
+splitPrefix :: String -> String -> Maybe String
+splitPrefix s [] = Just s
+splitPrefix (c : s) (p : ps)
+  | c == p    = splitPrefix s ps
+  | otherwise = Nothing
+
+symbols :: [(String, Token)]
+symbols =
+  [ ("(",  LParen),
+    (")",  RParen),
+    ("{",  LBrace),
+    ("}",  RBrace),
+    ("->", Arrow ),
+    (":",  Colon ),
+    (",",  Comma ),
+    (";",  SemiC ),
+    ("=",  Equal ),
+    ("--", LineComment)
+  ]
 
 type TParser a = Parser Token a
 
@@ -71,88 +107,96 @@ pInt = Parser $ \case
   IntTok n : rest -> Just (n, rest)
   _ -> Nothing
 
-pChar :: TParser Char
-pChar = Parser $ \case
-  CharTok c : rest -> Just (c, rest)
-  _ -> Nothing
-
 pparened :: TParser a -> TParser a
 pparened p = do
-  _ <- psym LParen
+  psym LParen
   a <- p
-  _ <- psym RParen
+  psym RParen
   return a
 
-pProgram :: TParser Program 
+pbraced :: TParser a -> TParser a
+pbraced p = do
+  psym LBrace
+  a <- p
+  psym RBrace
+  return a
+
+type Definition = Either DataDef FnDef
+type PreProgram = [Definition]
+
+pProgram :: TParser PreProgram 
 pProgram = pplus pDef
 
 pDef :: TParser Definition 
-pDef = pparened $
-  (psym DataKW >> pData) <|>
-  (psym DefKW >> pFn)
+pDef = 
+  (Left <$> pData) <|>
+  (Right <$> pFn)
 
-pData :: TParser Definition
+pData :: TParser DataDef
 pData = do
+  psym DataKW
   n <- pName
-  cs <- pplus pConstructor
+  psym Equal
+  cs <- pbraced $ pinterleave pConstructor (psym Comma)
   return (DataDef n cs)
 
 pConstructor :: TParser Constructor
-pConstructor = 
-  (do
-    n <- pName
-    return (n, [])
-  ) <|> pparened
-  (do
-    n <- pName
-    ts <- pplus pTypeSig
-    return (n, ts)
-  )
+pConstructor = do
+  n <- pName
+  ts <- pstar pTypeSig
+  return (n, ts)
 
 pTypeSig :: TParser TypeSig
 pTypeSig =
   AtomTS <$> pName
-  <|>
+  <|> pparened 
   (do
-    _ <- psym Arrow
-    ts <- pplus pTypeSig
-    return $foldr1 ArrTS ts
+    ts <- pinterleave pTypeSig (psym Arrow)
+    return (foldr1 ArrTS ts)
   )
 
-pFn :: TParser Definition
+pFn :: TParser FnDef
 pFn = do
-  name : params <- pNameList
-  FnDef name params <$> pExpr
-
-pNameList :: TParser [String]
-pNameList =
-  (do
-    n <- pName
-    return [n]
-  ) <|> pparened (pplus pName)
+  name <- pName
+  params <- pstar pName
+  psym Equal
+  body <- pExpr
+  psym SemiC
+  return (FnDef name params body)
 
 pExpr :: TParser Expr
 pExpr = 
-  IntE <$> pInt <|>
-  IntE . ord <$> pChar <|>
-  VarE <$> pName 
-  <|> pparened
   (do
-    _ <- psym CaseKW
+    psym CaseKW
     e <- pExpr
-    brs <- pplus pBranch
+    psym OfKW
+    brs <- pbraced $ pinterleave pBranch (psym Comma)
     return (CaseE e brs)
-  ) <|> pparened
+  ) <|>
   (do
-    es <- pplus pExpr
+    es <- pplus pExprAtom
     return (foldl1 AppE es)
   )
 
+pExprAtom :: TParser Expr
+pExprAtom =
+  IntE <$> pInt <|>
+  VarE <$> pName <|>
+  pparened pExpr
+
 pBranch :: TParser Branch 
-pBranch = pparened (pseq pNameList pExpr)
+pBranch = do
+  pat <- pplus pName
+  psym Arrow
+  expr <- pExpr
+  return (pat, expr)
 
 parse :: String -> Program
 parse s = case pp (tlex s) of
-  Just (p, []) -> p
+  Just (p, []) -> reorder p
   _ -> error "ParseError"
-  where Parser pp = pProgram
+  where 
+    Parser pp = pProgram
+    reorder [] = ([], [])
+    reorder (Left  dDef : rest) = first  (dDef :) $ reorder rest
+    reorder (Right fDef : rest) = second (fDef :) $ reorder rest

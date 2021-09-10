@@ -1,6 +1,6 @@
 # FCOMP
 
-A statically-typed non-strict pure-functional programming language with an S-expression like syntax.
+A compiler for a statically typed, purely functional programming language with lazy evaluation.
 
 ### Basics
 
@@ -19,7 +19,6 @@ A statically-typed non-strict pure-functional programming language with an S-exp
 - [ ] Lambda expressions
 - [ ] Ad hoc polymorphism
 - [ ] Monadic IO
-- [ ] Optimizations
 - [ ] Bootstrapping
 
 ### Example
@@ -31,4 +30,6 @@ gcc -O2 build/main.c -o build/main
 echo "64" | build/main
 ```
 
-[ref](https://www.microsoft.com/en-us/research/publication/implementing-functional-languages-a-tutorial/)
+[Implementing Functional Languages: a tutorial](https://www.microsoft.com/en-us/research/publication/implementing-functional-languages-a-tutorial/)
+
+[Write you a haskell](http://dev.stephendiehl.com/fun/index.html)

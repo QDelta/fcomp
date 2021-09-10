@@ -9,12 +9,15 @@ initialCore =
   ([("False", 0, 0), ("True", 0, 1), ("Nil", 0, 0), ("Cons", 2, 1)], [])
 
 genCore :: Program -> CoreProgram
-genCore = foldl addCoreDef initialCore
+genCore (dataDefs, fnDefs) = 
+  foldl addCoreFn (foldl addCoreData initialCore dataDefs) fnDefs
 
-addCoreDef :: CoreProgram -> Definition -> CoreProgram
-addCoreDef (cCons, cFn) (DataDef name constrs) =
+addCoreData :: CoreProgram -> DataDef -> CoreProgram
+addCoreData (cCons, cFn) (DataDef name constrs) =
   (addCoreConstrs constrs 0 cCons, cFn)
-addCoreDef (cCons, cFn) (FnDef name params body) =
+
+addCoreFn :: CoreProgram -> FnDef -> CoreProgram
+addCoreFn (cCons, cFn) (FnDef name params body) =
   (cCons, (name, length params, cBody) : cFn)
   where
     cBody = genCoreExpr cCons lm body

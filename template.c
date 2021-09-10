@@ -1,16 +1,19 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 #define STACK_INIT_CAP 16
 #define SLAB_INIT_CAP 128
 #define GC_INIT_THRESHOLD 64
 
+typedef char bool_t;
+#define FALSE 0
+#define TRUE  1
+
 typedef long addr_t;
 
 typedef void (*func_t)(void);
 
-typedef struct _node {
+typedef struct {
     enum {NApp, NGlobal, NInd, NData, NInt} type;
     union {
         // NApp
@@ -24,7 +27,7 @@ typedef struct _node {
         // NInt
         struct { int intv; };
     };
-    enum {ALIVE, UNTRACKED} gc_tag;
+    bool_t gc_reachable;
 } node_t;
 
 // free allocated memory in a node
@@ -174,8 +177,8 @@ void stack_traverse(void (*f)(addr_t)) {
 }
 
 void gc_track(addr_t a) {
-    if (mem(a)->type != NGlobal && mem(a)->gc_tag == UNTRACKED) {
-        mem(a)->gc_tag = ALIVE;
+    if (mem(a)->type != NGlobal && ! mem(a)->gc_reachable) {
+        mem(a)->gc_reachable = TRUE;
         switch (mem(a)->type) {
             case NApp:
                 gc_track(mem(a)->left);
@@ -195,18 +198,14 @@ void gc_track(addr_t a) {
 }
 
 void global_gc(void) {
-    for (long i = 0; i < slab_size; ++i) {
-        if (slab_arr[i].slot_tag == Occupied 
-            && slab_arr[i].node.type != NGlobal) {
-            slab_arr[i].node.gc_tag = UNTRACKED;
-        }
-    }
     stack_traverse(gc_track);
     for (long i = slab_size - 1; i >= 0; --i) {
         if (slab_arr[i].slot_tag == Occupied 
-            && slab_arr[i].node.type != NGlobal 
-            && slab_arr[i].node.gc_tag == UNTRACKED) {
-            slab_free(i);
+            && slab_arr[i].node.type != NGlobal) {
+            if (! slab_arr[i].node.gc_reachable)
+                slab_free(i);
+            else
+                slab_arr[i].node.gc_reachable = FALSE;
         }
     }
     stat_gc_count += 1;
@@ -426,6 +425,15 @@ void inst_not(void) {
 
 addr_t main_func_addr;
 
+void print_head(const char* format) {
+    inst_split();
+    inst_eval();
+    printf(format, mem(STACK_TOP)->intv);
+    fflush(stdout);
+    inst_pop(1);
+    inst_eval();
+}
+
 int main(void) {
     slab_init();
     stack_init();
@@ -439,13 +447,12 @@ int main(void) {
     inst_pushg(main_func_addr);
     inst_mkapp();
     inst_eval();
+
+    if (mem(STACK_TOP)->tag != 0) {
+        print_head("%d");
+    }
     while (mem(STACK_TOP)->tag != 0) {
-        inst_split();
-        inst_eval();
-        printf("%d,", mem(STACK_TOP)->intv);
-        fflush(stdout);
-        inst_pop(1);
-        inst_eval();
+        print_head(",%d");
     }
     putchar('\n');
 

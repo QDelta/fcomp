@@ -1,9 +1,6 @@
-(def diverge (not diverge))
+diverge = not diverge;
 
-(def (b2i b)
-  (case b
-    (False 0)
-    (True  1)))
+b2i b = case b of { False -> 0, True -> 1 };
 
-(def (main n)
-  (Cons (and False diverge) (Cons (or True diverge) Nil)))
+-- [0, 1]
+main n = Cons (b2i (and False diverge)) (Cons (b2i (or True diverge)) Nil);

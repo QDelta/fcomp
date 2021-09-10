@@ -8,7 +8,8 @@ module Parser.Parsec
     psat,
     psym,
     pstar,
-    pplus
+    pplus,
+    pinterleave
   ) where
 
 import Utils.Function
@@ -70,3 +71,9 @@ pplus p = do
   a <- p
   as <- pstar p
   return (a : as)
+
+pinterleave :: Parser i a -> Parser i b -> Parser i [a]
+pinterleave pa pb = do
+  first <- pa
+  rest <- pstar (snd <$> pseq pb pa)
+  return (first : rest)

@@ -1,27 +1,27 @@
-(def (if b x y)
-  (case b
-    (False y)
-    (True  x)))
+if b x y = case b of
+  { True  -> x
+  , False -> y
+  };
 
-(def (from n) (Cons n (from (+ 1 n))))
+from n = Cons n (from (add 1 n));
 
-(def (notDivide p n) (not (=? 0 (rem n p))))
+notDivide p n = not (eq 0 (rem n p));
 
-(def (filter f l)
-  (case l
-    (Nil Nil)
-    ((Cons h t) (if (f h) (Cons h (filter f t)) (filter f t)))))
+filter f l = case l of
+  { Nil -> Nil
+  , Cons h t -> if (f h) (Cons h (filter f t)) (filter f t)
+  };
 
-(def (sieve l)
-  (case l
-    (Nil Nil)
-    ((Cons p rest) (Cons p (sieve (filter (notDivide p) rest))))))
+sieve l = case l of
+  { Nil -> Nil
+  , Cons p rest -> Cons p (sieve (filter (notDivide p) rest))
+  };
 
-(def primes (sieve (from 2)))
+primes = sieve (from 2);
 
-(def (take n l)
-  (case l
-    (Nil Nil)
-    ((Cons h t) (if (=? 0 n) Nil (Cons h (take (- n 1) t))))))
+take n l = case l of
+  { Nil -> Nil
+  , Cons h t -> if (eq 0 n) Nil (Cons h (take (sub n 1) t))
+  };
 
-(def (main n) (take n primes))
+main n = take n primes;

@@ -16,14 +16,7 @@ codeGen p =
 
 -- TODO: a better mangle function
 mangle :: String -> String
-mangle n = case n of
-  "+" -> "ff_1"
-  "-" -> "ff_2"
-  "*" -> "ff_3"
-  "=?" -> "ff_4"
-  ">?" -> "ff_5"
-  "<?" -> "ff_6"
-  _   -> "ff_" ++ n
+mangle = ("f_" ++)
 
 genFn :: GlobalMap -> (String, Node) -> CCode
 genFn m (name, NGlobal _ code) =

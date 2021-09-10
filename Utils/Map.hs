@@ -1,10 +1,11 @@
-module Utils.Map
+module Utils.Map 
   ( Map,
     emptyMap,
     mElem,
     mLookupMaybe,
     mLookup,
     mInsert,
+    mUpdate,
     mToList,
     mFromList
   ) where
@@ -29,15 +30,18 @@ mLookup (M m) k defalt = Map.findWithDefault defalt k m
 mInsert :: Ord k => Map k v -> (k, v) -> Map k v
 mInsert (M m) (k, v) = M (Map.insert k v m)
 
-instance Foldable (Map k) where
-  foldr f x (M m) = foldr f x m
-  foldl f x (M m) = foldl f x m
+mUpdate :: Ord k => (v -> v) -> k -> Map k v -> Map k v
+mUpdate f k (M m) = M (Map.update (Just . f) k m)
 
 mToList :: Ord k => Map k v -> [(k, v)]
 mToList (M m) = Map.toList m
 
 mFromList :: Ord k => [(k, v)] -> Map k v
 mFromList l = M (Map.fromList l)
+
+instance Foldable (Map k) where
+  foldr f x (M m) = foldr f x m
+  foldl f x (M m) = foldl f x m
 
 instance Functor (Map k) where
   fmap f (M m) = M (Map.map f m)

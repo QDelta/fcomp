@@ -1,9 +1,0 @@
-(def (S x y z) (x z (y z)))
-
-(def (K x y) x)
-
-(def I (S K K))
-
-(def (double x) (+ x x))
-
-(def (main n) (Cons (double (I n)) Nil))
