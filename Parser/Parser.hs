@@ -10,7 +10,7 @@ data Token
   = LParen | RParen
   | LBrace | RBrace
   | DataKW | CaseKW | OfKW
-  | Arrow  | Colon  | Comma | SemiC | Equal
+  | Arrow  | SemiC  | Equal | Or
   | LineComment
   | NameTok String
   | IntTok Int
@@ -88,8 +88,7 @@ symbols =
     ("{",  LBrace),
     ("}",  RBrace),
     ("->", Arrow ),
-    (":",  Colon ),
-    (",",  Comma ),
+    ("|",  Or    ),
     (";",  SemiC ),
     ("=",  Equal ),
     ("--", LineComment)
@@ -121,6 +120,9 @@ pbraced p = do
   psym RBrace
   return a
 
+pSemiC :: TParser Token
+pSemiC = psym SemiC
+
 type Definition = Either DataDef FnDef
 type PreProgram = [Definition]
 
@@ -137,7 +139,8 @@ pData = do
   psym DataKW
   n <- pName
   psym Equal
-  cs <- pbraced $ pinterleave pConstructor (psym Comma)
+  cs <- pinterleave pConstructor (psym Or)
+  pSemiC
   return (DataDef n cs)
 
 pConstructor :: TParser Constructor
@@ -170,7 +173,7 @@ pExpr =
     psym CaseKW
     e <- pExpr
     psym OfKW
-    brs <- pbraced $ pinterleave pBranch (psym Comma)
+    brs <- pbraced $ pinterleave pBranch pSemiC
     return (CaseE e brs)
   ) <|>
   (do

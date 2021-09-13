@@ -1,9 +1,9 @@
 head l = case l of
   { Nil -> 0
-  , Cons h t -> h
+  ; Cons h t -> h
   };
 
 from n = Cons n (from (add 1 n));
 
 -- [1]
-main n = Cons (head (from 1)) Nil;
+start n = Cons (head (from 1)) Nil;

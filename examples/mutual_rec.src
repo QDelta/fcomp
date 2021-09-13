@@ -1,12 +1,12 @@
-data Even = { Z, OS Odd }
-data Odd = { ES Even }
+data Even = Z | OS Odd;
+data Odd = ES Even;
 
 toIntE n = case n of
   { Z -> 0
-  , OS m -> add 1 (toIntO m)
+  ; OS m -> add 1 (toIntO m)
   };
 
 toIntO n = case n of { ES m -> add 1 (toIntE m) };
 
 -- [3, n]
-main n = Cons (toIntO (ES (OS (ES Z)))) (Cons n Nil);
+start n = Cons (toIntO (ES (OS (ES Z)))) (Cons n Nil);

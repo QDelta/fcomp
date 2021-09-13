@@ -17,7 +17,7 @@ data Instruction
   | Alloc  Int
   | Unwind
   | Add  | Sub  | Mul  | Div  | Rem
-  | IsEq | IsGt | IsLt
+  | IsEq | IsGt | IsLt | IsNe | IsGe | IsLe
   | Not
   deriving (Show)
 

@@ -17,7 +17,7 @@ data NameEnv = NameEnv
   }
 
 data InferEnv = InferEnv
-  { vm :: VTMap,  -- type variables
+  {  vm :: VTMap, -- type variables
     cnt :: Int    -- unique id generator
   }
 
@@ -174,7 +174,7 @@ initialNameEnv = NameEnv
 
 initialInferEnv :: InferEnv
 initialInferEnv = InferEnv
-  { vm = emptyMap,
+  {  vm = emptyMap,
     cnt = 0
   }
 
@@ -195,6 +195,9 @@ primFn = mFromList
     ("eq",  ArrT IntT  (ArrT IntT boolT)),
     ("gt",  ArrT IntT  (ArrT IntT boolT)),
     ("lt",  ArrT IntT  (ArrT IntT boolT)),
+    ("ne",  ArrT IntT  (ArrT IntT boolT)),
+    ("ge",  ArrT IntT  (ArrT IntT boolT)),
+    ("le",  ArrT IntT  (ArrT IntT boolT)),
     ("and", ArrT boolT (ArrT boolT boolT)),
     ("or",  ArrT boolT (ArrT boolT boolT)),
     ("not", ArrT boolT boolT)

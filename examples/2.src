@@ -1,14 +1,14 @@
 len l = case l of
   { Nil -> 0
-  , Cons h t -> add 1 (len t)
+  ; Cons h t -> add 1 (len t)
   };
 
 concat l1 l2 = case l1 of
   { Nil -> l2
-  , Cons h t -> Cons h (concat t l2)
+  ; Cons h t -> Cons h (concat t l2)
   };
 
 foo = len (concat (Cons 0 (Cons 1 Nil)) (Cons (add 2 1) Nil));
 
 -- [n, 6]
-main n = Cons n (Cons (add foo foo) Nil);
+start n = Cons n (Cons (add foo foo) Nil);

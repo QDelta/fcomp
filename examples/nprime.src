@@ -1,6 +1,6 @@
-if b x y = case b of
+ifte b x y = case b of
   { True  -> x
-  , False -> y
+  ; False -> y
   };
 
 from n = Cons n (from (add 1 n));
@@ -9,19 +9,19 @@ notDivide p n = not (eq 0 (rem n p));
 
 filter f l = case l of
   { Nil -> Nil
-  , Cons h t -> if (f h) (Cons h (filter f t)) (filter f t)
+  ; Cons h t -> ifte (f h) (Cons h (filter f t)) (filter f t)
   };
 
 sieve l = case l of
   { Nil -> Nil
-  , Cons p rest -> Cons p (sieve (filter (notDivide p) rest))
+  ; Cons p rest -> Cons p (sieve (filter (notDivide p) rest))
   };
 
 primes = sieve (from 2);
 
 take n l = case l of
   { Nil -> Nil
-  , Cons h t -> if (eq 0 n) Nil (Cons h (take (sub n 1) t))
+  ; Cons h t -> ifte (eq 0 n) Nil (Cons h (take (sub n 1) t))
   };
 
-main n = take n primes;
+start n = take n primes;

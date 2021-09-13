@@ -3,4 +3,4 @@ K1 x y = x;
 K2 x y = x;
 I = S K1 K2;
 
-main n = Cons (I n) Nil;
+start n = Cons (I n) Nil;

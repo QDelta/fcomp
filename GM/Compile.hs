@@ -42,6 +42,9 @@ strictFnList =
     ("eq",  2, IsEq),
     ("lt",  2, IsLt),
     ("gt",  2, IsGt),
+    ("ne",  2, IsNe),
+    ("le",  2, IsLe),
+    ("ge",  2, IsGe),
     ("not", 1, Not )
   ]
 

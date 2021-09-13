@@ -1,0 +1,16 @@
+
+b2i b = case b of { True -> 1; False -> 0 };
+
+start n = 
+   Cons (add n 16) 
+  (Cons (sub n 16) 
+  (Cons (mul n 16) 
+  (Cons (div n 16) 
+  (Cons (rem n 16)
+  (Cons (b2i (eq n 16))
+  (Cons (b2i (ne n 16))
+  (Cons (b2i (lt n 16))
+  (Cons (b2i (le n 16))
+  (Cons (b2i (gt n 16))
+  (Cons (b2i (ge n 16))
+  Nil))))))))));

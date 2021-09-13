@@ -146,8 +146,8 @@ void stack_free(void) {
 }
 
 void exit_program(void) {
-    fflush(stdout);
     fflush(stderr);
+    fflush(stdout);
     stack_free();
     slab_destroy();
     exit(0);
@@ -331,88 +331,41 @@ void inst_alloc(int n) {
     }
 }
 
-void inst_add(void) {
-    addr_t a0 = STACK_OFFSET(0);
-    addr_t a1 = STACK_OFFSET(1);
-    addr_t a = mem_alloc();
-    mem(a)->type = NInt;
-    mem(a)->intv = mem(a0)->intv + mem(a1)->intv;
-    stack_sp -= 1;
-    STACK_TOP = a;
-}
+#define INST_INT_ARITH_BINOP(op) \
+    do { \
+    addr_t a0 = STACK_OFFSET(0); \
+    addr_t a1 = STACK_OFFSET(1); \
+    addr_t a = mem_alloc(); \
+    mem(a)->type = NInt; \
+    mem(a)->intv = (mem(a0)->intv) op (mem(a1)->intv); \
+    stack_sp -= 1; \
+    STACK_TOP = a; \
+    } while (0) \
 
-void inst_sub(void) {
-    addr_t a0 = STACK_OFFSET(0);
-    addr_t a1 = STACK_OFFSET(1);
-    addr_t a = mem_alloc();
-    mem(a)->type = NInt;
-    mem(a)->intv = mem(a0)->intv - mem(a1)->intv;
-    stack_sp -= 1;
-    STACK_TOP = a;
-}
+void inst_add(void) { INST_INT_ARITH_BINOP(+); }
+void inst_sub(void) { INST_INT_ARITH_BINOP(-); }
+void inst_mul(void) { INST_INT_ARITH_BINOP(*); }
+void inst_div(void) { INST_INT_ARITH_BINOP(/); }
+void inst_rem(void) { INST_INT_ARITH_BINOP(%); }
 
-void inst_mul(void) {
-    addr_t a0 = STACK_OFFSET(0);
-    addr_t a1 = STACK_OFFSET(1);
-    addr_t a = mem_alloc();
-    mem(a)->type = NInt;
-    mem(a)->intv = mem(a0)->intv * mem(a1)->intv;
-    stack_sp -= 1;
-    STACK_TOP = a;
-}
+#define INST_INT_CMP_BINOP(op) \
+    do { \
+    addr_t a0 = STACK_OFFSET(0); \
+    addr_t a1 = STACK_OFFSET(1); \
+    addr_t a = mem_alloc(); \
+    mem(a)->type = NData; \
+    mem(a)->tag = (mem(a0)->intv) op (mem(a1)->intv) ? 1 : 0; \
+    mem(a)->params = NULL; mem(a)->d_arity = 0; \
+    stack_sp -= 1; \
+    STACK_TOP = a; \
+    } while (0) \
 
-void inst_div(void) {
-    addr_t a0 = STACK_OFFSET(0);
-    addr_t a1 = STACK_OFFSET(1);
-    addr_t a = mem_alloc();
-    mem(a)->type = NInt;
-    mem(a)->intv = mem(a0)->intv / mem(a1)->intv;
-    stack_sp -= 1;
-    STACK_TOP = a;
-}
-
-void inst_rem(void) {
-    addr_t a0 = STACK_OFFSET(0);
-    addr_t a1 = STACK_OFFSET(1);
-    addr_t a = mem_alloc();
-    mem(a)->type = NInt;
-    mem(a)->intv = mem(a0)->intv % mem(a1)->intv;
-    stack_sp -= 1;
-    STACK_TOP = a;
-}
-
-void inst_iseq(void) {
-    addr_t a0 = STACK_OFFSET(0);
-    addr_t a1 = STACK_OFFSET(1);
-    addr_t a = mem_alloc();
-    mem(a)->type = NData;
-    mem(a)->tag = mem(a0)->intv == mem(a1)->intv ? 1 : 0;
-    mem(a)->params = NULL; mem(a)->d_arity = 0;
-    stack_sp -= 1;
-    STACK_TOP = a;
-}
-
-void inst_isgt(void) {
-    addr_t a0 = STACK_OFFSET(0);
-    addr_t a1 = STACK_OFFSET(1);
-    addr_t a = mem_alloc();
-    mem(a)->type = NData;
-    mem(a)->tag = mem(a0)->intv > mem(a1)->intv ? 1 : 0;
-    mem(a)->params = NULL; mem(a)->d_arity = 0;
-    stack_sp -= 1;
-    STACK_TOP = a;
-}
-
-void inst_islt(void) {
-    addr_t a0 = STACK_OFFSET(0);
-    addr_t a1 = STACK_OFFSET(1);
-    addr_t a = mem_alloc();
-    mem(a)->type = NData;
-    mem(a)->tag = mem(a0)->intv < mem(a1)->intv ? 1 : 0;
-    mem(a)->params = NULL; mem(a)->d_arity = 0;
-    stack_sp -= 1;
-    STACK_TOP = a;
-}
+void inst_iseq(void) { INST_INT_CMP_BINOP(==); }
+void inst_isgt(void) { INST_INT_CMP_BINOP(>); }
+void inst_islt(void) { INST_INT_CMP_BINOP(<); }
+void inst_isne(void) { INST_INT_CMP_BINOP(!=); }
+void inst_isge(void) { INST_INT_CMP_BINOP(>=); }
+void inst_isle(void) { INST_INT_CMP_BINOP(<=); }
 
 void inst_not(void) {
     addr_t a0 = STACK_TOP;
@@ -423,13 +376,12 @@ void inst_not(void) {
     STACK_TOP = a;
 }
 
-addr_t main_func_addr;
+addr_t entry_func_addr;
 
 void print_head(const char* format) {
     inst_split();
     inst_eval();
     printf(format, mem(STACK_TOP)->intv);
-    fflush(stdout);
     inst_pop(1);
     inst_eval();
 }
@@ -444,7 +396,7 @@ int main(void) {
     scanf("%d", &input);
     
     inst_pushi(input);
-    inst_pushg(main_func_addr);
+    inst_pushg(entry_func_addr);
     inst_mkapp();
     inst_eval();
 

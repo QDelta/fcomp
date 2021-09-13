@@ -1,23 +1,22 @@
 if b x y = case b of
   { True  -> x
-  , False -> y
+  ; False -> y
   };
 
 take n l = case l of
   { Nil -> Nil
-  , Cons h t -> if (eq 0 n) Nil (Cons h (take (sub n 1) t))
+  ; Cons h t -> if (eq 0 n) Nil (Cons h (take (sub n 1) t))
   };
 
 map f l = case l of
   { Nil -> Nil
-  , Cons h t -> Cons (f h) t
+  ; Cons h t -> Cons (f h) t
   };
 
 nats = Cons 0 (map (add 1) nats);
 
 isEven n = eq 0 (rem n 2);
 
-b2i b = if b 1 0
+b2i b = if b 1 0;
 
-main n = take n (map b2i (map isEven nats));
-
+start n = take n (map b2i (map isEven nats));
