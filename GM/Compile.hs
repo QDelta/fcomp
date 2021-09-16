@@ -1,5 +1,6 @@
 module GM.Compile where
 
+import Utils.Function
 import Utils.Map
 import Type.CoreDef
 import GM.Def
@@ -79,9 +80,9 @@ compileWHNF :: Frame -> CoreExpr -> Code
 compileWHNF _ (IntCE n) = [PushI n]
 compileWHNF f (CaseCE e brs) = compileWHNF f e ++ [Jump (compileBranches f brs)]
 compileWHNF f (AppCE (GVarCE op) e) | op `mElem` strictUnaryFns =
-  compileWHNF f e ++ [mLookup strictUnaryFns op (error "")]
+  compileWHNF f e ++ [assertJust $ mLookup op strictUnaryFns]
 compileWHNF f (AppCE (AppCE (GVarCE op) e1) e2) | op `mElem` strictBinFns =
-  compileWHNF f e2 ++ compileWHNF (pushStack f 1) e1 ++ [mLookup strictBinFns op (error "")]
+  compileWHNF f e2 ++ compileWHNF (pushStack f 1) e1 ++ [assertJust $ mLookup op strictBinFns]
 compileWHNF f e = compileLazy f e ++ [Eval]
 
 -- TODO: lazy case: generate a function

@@ -2,10 +2,10 @@ module Utils.Map
   ( Map,
     emptyMap,
     mElem,
-    mLookupMaybe,
     mLookup,
     mInsert,
     mUpdate,
+    mRemove,
     mToList,
     mFromList
   ) where
@@ -21,17 +21,17 @@ emptyMap = M Map.empty
 mElem :: Ord k => k -> Map k v -> Bool
 mElem k (M m) = Map.member k m
 
-mLookupMaybe :: Ord k => Map k v -> k -> Maybe v
-mLookupMaybe (M m) k = Map.lookup k m
+mLookup :: Ord k => k -> Map k v -> Maybe v
+mLookup  k (M m)= Map.lookup k m
 
-mLookup :: Ord k => Map k v -> k -> v -> v
-mLookup (M m) k defalt = Map.findWithDefault defalt k m
-
-mInsert :: Ord k => Map k v -> (k, v) -> Map k v
-mInsert (M m) (k, v) = M (Map.insert k v m)
+mInsert :: Ord k => (k, v) -> Map k v -> Map k v
+mInsert (k, v) (M m) = M (Map.insert k v m)
 
 mUpdate :: Ord k => (v -> v) -> k -> Map k v -> Map k v
 mUpdate f k (M m) = M (Map.update (Just . f) k m)
+
+mRemove :: Ord k => k -> Map k v -> Map k v
+mRemove k (M m) = M (Map.delete k m)
 
 mToList :: Ord k => Map k v -> [(k, v)]
 mToList (M m) = Map.toList m

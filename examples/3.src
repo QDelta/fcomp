@@ -1,6 +1,6 @@
 map f l = case l of
   { Nil -> Nil
-  ; Cons h t -> Cons (f h) t
+  ; Cons h t -> Cons (f h) (map f t)
   };
 
 head l = case l of

@@ -1,6 +1,6 @@
-S x y z = x z (y z);
-K1 x y = x;
-K2 x y = x;
-I = S K1 K2;
+s x y z = x z (y z);
+k1 x y = x;
+k2 x y = x;
+i = s k1 k2;
 
-start n = Cons (I n) Nil;
+start n = Cons (i n) Nil;

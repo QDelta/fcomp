@@ -15,7 +15,7 @@ module Parser.Parsec
 import Utils.Function
 import Control.Applicative (Alternative(..))
 
-newtype Parser i o = Parser ([i] -> Maybe (o, [i]))
+newtype Parser i o = Parser { runParser :: [i] -> Maybe (o, [i]) }
 
 instance Monad (Parser i) where
   return a = Parser $ \is -> Just (a, is)
@@ -41,8 +41,8 @@ instance Alternative (Parser i) where
       r@(Just (_, _)) -> r
       Nothing -> p2 is
 
-instance MonadFail (Parser i) where
-  fail = error
+-- instance MonadFail (Parser i) where
+--   fail = error
 
 pitem :: Parser i i
 pitem = Parser $ \case

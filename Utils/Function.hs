@@ -6,6 +6,9 @@ first f (x, y) = (f x, y)
 second :: (b -> c) -> (a, b) -> (a, c)
 second f (x, y) = (x, f y)
 
+assertJust :: Maybe t -> t
+assertJust (Just a) = a
+
 mapAccumL :: (a -> b -> (c, a)) -> a -> [b] -> ([c], a)
 mapAccumL f acc [] = ([], acc)
 mapAccumL f acc (x : xs) = (x' : xs', acc2)
@@ -33,15 +36,6 @@ isortWith f = isortBy (\x y -> compare (f x) (f y))
 
 isort :: Ord k => [k] -> [k]
 isort = isortBy compare
-
--- genUnique :: (Eq k, Ord k) => [k] -> k -> k
--- genUnique s def = genUniqueFrom sorted (minOrDef sorted def)
---   where
---     sorted = sort s
---     genUniqueFrom [] k = k
---     genUniqueFrom (k0 : ks) k
---       | k == k0 = genUniqueFrom ks (succ k)
---       | otherwise = k
 
 checkUnique :: (Ord k) => [k] -> Bool
 checkUnique = checkUSorted . isort

@@ -1,9 +1,12 @@
 module Parser.AST where
 
 data TypeSig
-  = AtomTS String
+  = VarTS String
+  | DataTS String [TypeSig]
   | ArrTS TypeSig TypeSig
   deriving (Show)
+
+-- Pair (a -> b) c = App (App Pair (Arr a b)) c
 
 data Expr
   = IntE Int
@@ -12,12 +15,12 @@ data Expr
   | CaseE Expr [Branch]
   deriving (Show)
 
-type Branch = ([String], Expr) -- pattern, body
+type Branch = (String, [String], Expr) -- constructor, bindings, body
 
 type Constructor = (String, [TypeSig]) -- name, types
 
 data DataDef = 
-  DataDef String [Constructor] -- name, constructors
+  DataDef String [String] [Constructor] -- name, type params, constructors
   deriving (Show)
 
 data FnDef = 

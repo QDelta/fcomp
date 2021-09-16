@@ -8,9 +8,7 @@ module Utils.Set
     sFromList,
     sUnion,
     sSingleton,
-    sIsEmpty,
-    sRemoveMin,
-    sIntersect
+    sIsEmpty
   ) where
 
 import qualified Data.Set as Set
@@ -43,12 +41,6 @@ sSingleton = S . Set.singleton
 
 sIsEmpty :: Set k -> Bool
 sIsEmpty (S s) = Set.null s
-
-sRemoveMin :: Ord k => Set k -> (k, Set k)
-sRemoveMin (S s) = (Set.findMin s, S $ Set.deleteMin s)
-
-sIntersect :: Ord k => Set k -> Set k -> Set k
-sIntersect (S s1) (S s2) = S (Set.intersection s1 s2)
 
 instance Foldable Set where
   foldl f x (S s) = foldl f x s

@@ -12,7 +12,8 @@ data Token
   | DataKW | CaseKW | OfKW
   | Arrow  | SemiC  | Equal | Or
   | LineComment
-  | NameTok String
+  | UNameTok String
+  | LNameTok String
   | IntTok Int
   deriving (Show, Eq)
 
@@ -22,7 +23,8 @@ tlex s = case s of
   c : cs
     | isSpace c -> tlex cs
     | isDigit c -> callLex intLex
-    | isAlpha c -> callLex nameLex
+    | isUpperAlpha c -> callLex (nameLex UNameTok)
+    | isLowerAlpha c -> callLex (nameLex LNameTok)
     | otherwise -> callLex symLex
   where
     callLex f = toks
@@ -46,8 +48,14 @@ isSpace = (`elem` " \t\r\n")
 isDigit :: Char -> Bool
 isDigit = (`elem` "0123456789")
 
+isUpperAlpha :: Char -> Bool
+isUpperAlpha c = 'A' <= c && c <= 'Z'
+
+isLowerAlpha :: Char -> Bool
+isLowerAlpha c = 'a' <= c && c <= 'z'
+
 isAlpha :: Char -> Bool
-isAlpha c = ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z')
+isAlpha c = isUpperAlpha c || isLowerAlpha c
 
 intLex :: String -> (Token, String)
 intLex s = (ti, rest)
@@ -55,8 +63,8 @@ intLex s = (ti, rest)
     (istr, rest) = span isDigit s
     ti = IntTok (read istr)
 
-nameLex :: String -> (Token, String)
-nameLex s = (tn, rest)
+nameLex :: (String -> Token) -> String -> (Token, String)
+nameLex f s = (tn, rest)
   where 
     isNameC c = isAlpha c || isDigit c
     (name, rest) = span isNameC s
@@ -64,7 +72,7 @@ nameLex s = (tn, rest)
       "data" -> DataKW
       "case" -> CaseKW
       "of"   -> OfKW
-      _      -> NameTok name
+      _      -> f name
 
 symLex :: String -> (Token, String)
 symLex s = symLexFrom s symbols
@@ -96,10 +104,18 @@ symbols =
 
 type TParser a = Parser Token a
 
-pName :: TParser String
-pName = Parser $ \case
-  NameTok n : ts -> Just (n, ts)
+pUName :: TParser String
+pUName = Parser $ \case
+  UNameTok n : ts -> Just (n, ts)
   _ -> Nothing
+
+pLName :: TParser String
+pLName = Parser $ \case
+  LNameTok n : ts -> Just (n, ts)
+  _ -> Nothing
+
+pName :: TParser String
+pName = pUName <|> pLName
 
 pInt :: TParser Int
 pInt = Parser $ \case
@@ -137,31 +153,39 @@ pDef =
 pData :: TParser DataDef
 pData = do
   psym DataKW
-  n <- pName
+  n <- pUName
+  params <- pstar pLName
   psym Equal
   cs <- pinterleave pConstructor (psym Or)
   pSemiC
-  return (DataDef n cs)
+  return (DataDef n params cs)
 
 pConstructor :: TParser Constructor
 pConstructor = do
-  n <- pName
+  n <- pUName
   ts <- pstar pTypeSig
   return (n, ts)
 
 pTypeSig :: TParser TypeSig
-pTypeSig =
-  AtomTS <$> pName
-  <|> pparened 
+pTypeSig = do
+  ts <- pinterleave pTSTerm (psym Arrow)
+  return (foldr1 ArrTS ts)
+
+pTSTerm :: TParser TypeSig
+pTSTerm = 
   (do
-    ts <- pinterleave pTypeSig (psym Arrow)
-    return (foldr1 ArrTS ts)
-  )
+    dName <- pUName
+    ts <- pstar pTSAtom
+    return (DataTS dName ts)
+  ) <|> pTSAtom
+
+pTSAtom :: TParser TypeSig
+pTSAtom = (VarTS <$> pLName) <|> pparened pTypeSig
 
 pFn :: TParser FnDef
 pFn = do
-  name <- pName
-  params <- pstar pName
+  name <- pLName
+  params <- pstar pLName
   psym Equal
   body <- pExpr
   psym SemiC
@@ -189,17 +213,17 @@ pExprAtom =
 
 pBranch :: TParser Branch 
 pBranch = do
-  pat <- pplus pName
+  constr <- pUName
+  binds <- pstar pLName
   psym Arrow
   expr <- pExpr
-  return (pat, expr)
+  return (constr, binds, expr)
 
 parse :: String -> Program
-parse s = case pp (tlex s) of
+parse s = case runParser pProgram (tlex s) of
   Just (p, []) -> reorder p
   _ -> error "ParseError"
   where 
-    Parser pp = pProgram
     reorder [] = ([], [])
     reorder (Left  dDef : rest) = first  (dDef :) $ reorder rest
     reorder (Right fDef : rest) = second (fDef :) $ reorder rest

@@ -1,5 +1,6 @@
 module Type.CoreGen where
 
+import Utils.Function
 import Utils.Map
 import Parser.AST
 import Type.CoreDef
@@ -13,8 +14,14 @@ genCore (dataDefs, fnDefs) =
   foldl addCoreFn (foldl addCoreData initialCore dataDefs) fnDefs
 
 addCoreData :: CoreProgram -> DataDef -> CoreProgram
-addCoreData (cCons, cFn) (DataDef name constrs) =
+addCoreData (cCons, cFn) (DataDef name _ constrs) =
   (addCoreConstrs constrs 0 cCons, cFn)
+
+addCoreConstrs :: [Constructor] -> Int -> [CoreConstr] -> [CoreConstr]
+addCoreConstrs [] _ x = x
+addCoreConstrs ((name, tSigs) : rest) tag cCons =
+  addCoreConstrs rest (tag + 1) newCCons
+  where newCCons = (name, length tSigs, tag) : cCons
 
 addCoreFn :: CoreProgram -> FnDef -> CoreProgram
 addCoreFn (cCons, cFn) (FnDef name params body) =
@@ -23,18 +30,12 @@ addCoreFn (cCons, cFn) (FnDef name params body) =
     cBody = genCoreExpr cCons lm body
     lm = mFromList $ zip params [0..]
 
-addCoreConstrs :: [Constructor] -> Int -> [CoreConstr] -> [CoreConstr]
-addCoreConstrs [] _ x = x
-addCoreConstrs ((name, tSigs) : rest) tag cCons =
-  addCoreConstrs rest (tag + 1) newCCons
-  where newCCons = (name, length tSigs, tag) : cCons
-
 type LOffSetMap = Map String Int -- (local var, offset)
 
 genCoreExpr :: [CoreConstr] -> LOffSetMap -> Expr -> CoreExpr
 genCoreExpr _ _ (IntE n) = IntCE n
 genCoreExpr _ lm (VarE name) =
-  case mLookupMaybe lm name of
+  case mLookup name lm of
     Just i -> LVarCE i
     Nothing -> GVarCE name
 genCoreExpr cCons lm (AppE e1 e2) = AppCE (gen e1) (gen e2)
@@ -46,9 +47,9 @@ genCoreExpr cCons lm (CaseE e brs) =
     coreBrs = map (genCoreBranch cCons lm) brs
 
 genCoreBranch :: [CoreConstr] -> LOffSetMap -> Branch -> CoreBranch 
-genCoreBranch cCons lm (name : binds, e) = (arity, tag, ce)
+genCoreBranch cCons lm (name, binds, e) = (arity, tag, ce)
   where
     atMap = mFromList $ map (\(n, a, t) -> (n, (a, t))) cCons
-    (arity, tag) = mLookup atMap name (error $ "can not find constructor " ++ name)
-    tmpLM = foldl mInsert lm (zip binds [length lm..])
+    (arity, tag) = assertJust $ mLookup name atMap
+    tmpLM = foldr mInsert lm (zip binds [length lm..])
     ce = genCoreExpr cCons tmpLM e

@@ -14,7 +14,7 @@ A compiler for a statically typed, purely functional programming language with l
 
 - [x] Integer Primitives
 - [x] Type inference
-- [ ] Parametric polymorphism
+- [x] Parametric polymorphism
 - [ ] Let bindings
 - [ ] Lambda expressions
 - [ ] Ad hoc polymorphism

@@ -1,98 +1,259 @@
 module Type.Inf where
 
+import Data.Graph (SCC, stronglyConnComp, flattenSCC)
+import Data.Foldable (traverse_)
+
 import Utils.Function
 import Utils.Map
+import Utils.Set
+import Utils.State
 import Parser.AST
 import Type.Def
 
-type FTMap = Map String MType
-type DTMap = Map String MType
-type CTMap = Map String MType
+type DTMap = Map String Int -- name, arity
+type FTMap = Map String PType
+type CTMap = Map String PType
+type LTMap = Map String MType
 type VTMap = Map Int MType
 
-data NameEnv = NameEnv
-  { fm :: FTMap,  -- functions
-    dm :: DTMap,  -- data types
-    cm :: CTMap   -- constructors
+data TypeEnv = TypeEnv
+  { dtmap :: DTMap -- global data types
+  , ftmap :: FTMap -- global functions
+  , ctmap :: CTMap -- global constructors
+  , ltmap :: LTMap -- local variables
+  , vtmap :: VTMap -- equations for type variables
+  , index :: Int   -- unique id generator
   }
 
-data InferEnv = InferEnv
-  {  vm :: VTMap, -- type variables
-    cnt :: Int    -- unique id generator
+instance Show TypeEnv where
+  show env = 
+    "Data types:\n" ++ show (dtmap env) ++ "\n\n" ++
+    "Functions:\n" ++ show (ftmap env) ++ "\n\n" ++
+    "Constructors:\n" ++ show (ctmap env) ++ "\n"
+
+initialTypeEnv :: TypeEnv
+initialTypeEnv = TypeEnv
+  { dtmap = primData
+  , ftmap = primFn
+  , ctmap = primConstr
+  , ltmap = emptyMap
+  , vtmap = emptyMap
+  , index = 0
   }
 
-type TypeEnv = (NameEnv, InferEnv)
+type TState a = State TypeEnv a
 
--- TODO: state monad
+typeError :: String -> TState a
+typeError = error
 
-newType :: InferEnv -> (MType, InferEnv)
-newType env = (VarT id, env {cnt = id + 1})
-  where id = cnt env
+clearInfer :: TState ()
+clearInfer = State $
+  \env -> ((), env { ltmap = emptyMap, vtmap = emptyMap, index = 0 })
 
-resolve :: InferEnv -> MType -> MType
-resolve env (VarT p) = 
-  case mLookupMaybe (vm env) p of
-    Just (VarT p) -> resolve env (VarT p)
-    Just t -> t
-    Nothing -> VarT p
-resolve _ t = t
+getEnv :: (TypeEnv -> a) -> TState a
+getEnv f = State $
+  \env -> (f env, env)
 
-unify :: InferEnv -> (MType, MType) -> InferEnv
-unify env (l, r) = 
-  case (resolve env l, resolve env r) of
-    (VarT lp,    rt        ) -> bindVar env (lp, rt)
-    (lt,         VarT rp   ) -> bindVar env (rp, lt)
-    (ArrT ll lr, ArrT rl rr) ->
-      unify (unify env (ll, rl)) (lr, rr)
-    (lt,         rt        ) -> 
-      if lt == rt then env else error $ "can not unify " ++ show lt ++ " with " ++ show rt
+-- get : (Map -> a) -> TState a
+getD f = getEnv (f . dtmap)
+getF f = getEnv (f . ftmap)
+getC f = getEnv (f . ctmap)
+getL f = getEnv (f . ltmap)
+getV f = getEnv (f . vtmap)
 
-bindVar :: InferEnv -> (Int, MType) -> InferEnv
-bindVar env (p1, VarT p2) | p1 == p2 = env
-bindVar env (p, t) = env {vm = mInsert (vm env) (p, t)}
+-- set : (Map -> Map) -> TState ()
+setD f = State $ \env -> 
+  let newEnv = env { dtmap = f (dtmap env) }
+  in ((), newEnv) -- { dblog = dblog newEnv ++ ["D " ++ show newEnv] })
+setF f = State $ \env -> 
+  let newEnv = env { ftmap = f (ftmap env) }
+  in ((), newEnv) -- { dblog = dblog newEnv ++ ["F " ++ show newEnv] })
+setC f = State $ \env -> 
+  let newEnv = env { ctmap = f (ctmap env) }
+  in ((), newEnv) -- { dblog = dblog newEnv ++ ["C " ++ show newEnv] })
+setL f = State $ \env -> 
+  let newEnv = env { ltmap = f (ltmap env) }
+  in ((), newEnv) -- { dblog = dblog newEnv ++ ["L " ++ show newEnv] })
+setV f = State $ \env -> 
+  let newEnv = env { vtmap = f (vtmap env) }
+  in ((), newEnv) -- { dblog = dblog newEnv ++ ["V " ++ show newEnv] })
 
-bindF :: NameEnv -> (String, MType) -> NameEnv
-bindF env (name, t) = env {fm = mInsert (fm env) (name, t)}
+bindD p = setD (mInsert p)
+bindF p = setF (mInsert p)
+bindC p = setC (mInsert p)
+bindL p = setL (mInsert p)
+bindV p = setV (mInsert p)
 
-bindC :: NameEnv -> (String, MType) -> NameEnv
-bindC env (name, t) = env {cm = mInsert (cm env) (name, t)}
+newTypeVar :: TState MType
+newTypeVar = State $
+  \env -> 
+    let 
+      id = index env
+      newEnv = env { index = id + 1 }
+    in
+      (VarT id, newEnv) --newEnv { dblog = dblog newEnv ++ ["NV " ++ show newEnv] })
 
-bindD :: NameEnv -> (String, MType) -> NameEnv
-bindD env (name, t) = env {dm = mInsert (dm env) (name, t)}
+newTypeVars :: Int -> TState [MType]
+newTypeVars n = traverse (const newTypeVar) (replicate n ())
 
-inferExpr :: NameEnv -> InferEnv -> Expr -> (MType, InferEnv)
-inferExpr ne ie expr = case expr of
-  IntE _ -> (IntT, ie)
-  VarE name -> (t, ie)
-    where 
-      t = mLookup (fm ne) name $
-        mLookup (cm ne) name (error $ "undefined " ++ name)
-  AppE l r -> (ret, newIE)
-    where
-      (lt, ie1) = inferE ie l
-      (rt, ie2) = inferE ie1 r
-      (ret, ie3) = newType ie2
-      newIE = unify ie3 (ArrT rt ret, lt)
-  CaseE expr brs -> (brType, newIE)
-    where
-      (eType, ie1) = inferE ie expr
-      (brType, ie2) = newType ie1
-      (tPairs, ie3) = mapAccumL (inferBr ne) ie2 brs
-      (patTypes, actualBrTs) = unzip tPairs
-      ie4 = foldl unify ie3 (zip (repeat eType) patTypes)
-      newIE = foldl unify ie4 (zip (repeat brType) actualBrTs)
-  where inferE = inferExpr ne
-
--- (type of pattern, type of body)
-inferBr :: NameEnv -> InferEnv -> ([String], Expr) -> ((MType, MType), InferEnv)
-inferBr ne ie (constr : params, body) = ((assertDataT pType, bType), newIE)
+depGroupSort :: Set String -> [FnDef] -> [[FnDef]]
+depGroupSort constrNames defs = map flattenSCC sccs
   where
-    consType = mLookup (cm ne) constr (error $ "undefined constructor " ++ constr)
-    (binds, pType) = paramBind params consType
-    tmpNE = foldl bindF ne binds
-    (bType, newIE) = inferExpr tmpNE ie body
-    assertDataT t@(DataT _) = t
-    assertDataT _ = error "invalid pattern"
+    depGraph = genDepGraph constrNames defs
+    sccs = stronglyConnComp depGraph
+
+-- (f1, f2) in E : f1 (indirectly) calls f2
+genDepGraph :: Set String -> [FnDef] -> [(FnDef, String, [String])]
+genDepGraph constrNames = map genDep
+  where
+    genDep def@(FnDef name params body) =
+      (def, name, sToList $ directDepsExpr knowns body)
+      where
+        knowns = sUnion constrNames (sFromList params)
+
+directDepsExpr :: Set String -> Expr -> Set String
+directDepsExpr locals expr = case expr of
+  IntE _ -> emptySet
+  VarE name -> if name `sElem` locals then emptySet else sSingleton name
+  AppE l r -> sUnion (deps l) (deps r)
+  CaseE e brs -> sUnion (deps e) (directDepsBranches locals brs)
+  where deps = directDepsExpr locals
+
+directDepsBranches :: Set String -> [Branch] -> Set String
+directDepsBranches locals brs = 
+  foldl sUnion emptySet (map dDepBr brs)
+  where
+    dDepBr :: Branch -> Set String
+    dDepBr (constr, params, expr) = 
+      directDepsExpr (sUnion locals (sFromList params)) expr
+
+exConstrs :: [DataDef] -> Set String
+exConstrs defs = foldl sUnion emptySet (map ex defs)
+  where ex (DataDef _ _ constrs) = sFromList $ map fst constrs
+
+infer :: Program -> String
+infer prog = show env
+  where env = execState (inferProgram prog) initialTypeEnv
+
+inferProgram :: Program -> TState ()
+inferProgram (dataDefs, fnDefs) = do
+  traverse_ constructData dataDefs
+  traverse_ inferData dataDefs
+  let constrNames = exConstrs dataDefs
+  let fnGrps = depGroupSort constrNames fnDefs
+  traverse_ inferGroup fnGrps
+
+constructData :: DataDef -> TState ()
+constructData (DataDef name tparams _) =
+  bindD (name, length tparams)
+
+inferData :: DataDef -> TState ()
+inferData (DataDef name tpNames constrs) = do
+  traverse_ inferConstr constrs
+  where
+    tparams = take (length tpNames) [0..]
+    tpMap = mFromList (zip tpNames tparams)
+    dType = DataT name (map VarT tparams)
+
+    inferConstr :: Constructor -> TState ()
+    inferConstr (name, tss) = do
+      types <- traverse tsToType tss
+      let cType = Forall (sFromList tparams) (foldr ArrT dType types)
+      bindC (name, cType)
+
+    tsToType :: TypeSig -> TState MType
+    tsToType (VarTS name) = 
+      case mLookup name tpMap of
+        Just p -> return $ VarT p
+        Nothing -> typeError $ "undefined type parameter " ++ name
+    tsToType (ArrTS l r) = do
+      lt <- tsToType l
+      rt <- tsToType r
+      return (ArrT lt rt)
+    tsToType (DataTS name tss) = do
+      maybeArity <- getD (mLookup name)
+      arity <- case maybeArity of
+        Just a -> return a
+        Nothing -> typeError $ "undefined data type " ++ name
+      name' <- if arity == length tss then return name else typeError "incomplete data type"
+      types <- traverse tsToType tss
+      return (DataT name' types)
+
+inferGroup :: [FnDef] -> TState ()
+inferGroup group = do
+  inferGroupM group
+  let names = map (\(FnDef name _ _) -> name) group
+  mtypes <- traverse (getL . (\n -> assertJust . mLookup n)) names
+  ptypes <- traverse generalize mtypes
+  traverse_ bindF $ zip names ptypes
+  clearInfer
+
+inferGroupM :: [FnDef] -> TState ()
+inferGroupM group = do
+  traverse_ constrFn group
+  traverse_ inferFn group
+
+constrFn :: FnDef -> TState ()
+constrFn (FnDef name params _) = do
+  ptypes <- newTypeVars (length params)
+  retType <- newTypeVar
+  let fType = foldr ArrT retType ptypes
+  bindL (name, fType)
+
+inferFn :: FnDef -> TState ()
+inferFn (FnDef name params body) = do
+  fType <- getL (assertJust . mLookup name)
+  let (binds, retType) = paramBind params fType
+  traverse_ bindL binds
+  bType <- inferExpr body
+  unify retType bType
+  traverse_ (setL . mRemove) params
+
+inferExpr :: Expr -> TState MType
+inferExpr (IntE _) = return mIntT
+inferExpr (VarE name) = do
+  maybel <- getL (mLookup name)
+  case maybel of
+    Just t -> return t
+    Nothing -> do
+      maybef <- getF (mLookup name)
+      case maybef of
+        Just t -> instantiate t
+        Nothing -> do
+          maybec <- getC (mLookup name)
+          case maybec of
+            Just t -> instantiate t
+            Nothing -> typeError $ "undefined name " ++ name
+inferExpr (AppE l r) = do
+  lt <- inferExpr l
+  rt <- inferExpr r
+  appT <- newTypeVar
+  unify lt (ArrT rt appT)
+  return appT
+inferExpr (CaseE expr brs) = do
+  eType <- inferExpr expr
+  brType <- newTypeVar
+  tPairs <- traverse inferBr brs
+  let (patTypes, actualBrTs) = unzip tPairs
+  traverse_ (unify eType) patTypes
+  traverse_ (unify brType) actualBrTs
+  return brType
+
+inferBr :: Branch -> TState (MType, MType)
+inferBr (constr, params, body) = do
+  maybep <- getC (mLookup constr)
+  cTypeP <- case maybep of
+    Just t -> return t
+    Nothing -> typeError $ "undefined constructor " ++ constr
+  cType <- instantiate cTypeP
+  let (binds, patType) = paramBind params cType
+  traverse_ bindL binds
+  bType <- inferExpr body
+  traverse_ (setL . mRemove) params
+  return (assertDataT patType, bType)
+  where
+    assertDataT t@(DataT _ _) = t
+    assertDataT _ = error "pattern with non-data type"
 
 -- params -> function type -> (binds, return type)
 paramBind :: [String] -> MType -> ([(String, MType)], MType)
@@ -100,120 +261,116 @@ paramBind [] t = ([], t)
 paramBind (n : ns) (ArrT t1 t2) = ((n, t1) : restBind, ret)
   where (restBind, ret) = paramBind ns t2
 
-multiArrT :: MType -> [MType] -> MType
-multiArrT = foldr ArrT
+deepResolve :: MType -> TState MType
+deepResolve (VarT p) = do
+  maybet <- getV (mLookup p)
+  case maybet of
+    Just t -> deepResolve t
+    Nothing -> return (VarT p)
+deepResolve (ArrT l r) = do
+  lt <- deepResolve l
+  rt <- deepResolve r
+  return (ArrT lt rt)
+deepResolve (DataT n ts) = do
+  rts <- traverse deepResolve ts
+  return (DataT n rts)
 
-constructDataDef :: TypeEnv -> DataDef -> TypeEnv
-constructDataDef (ne, ie) (DataDef name constrs) = (newNE, ie)
-  where
-    newNE = ne `bindD` (name, DataT name)
+resolve :: MType -> TState MType
+resolve (VarT p) = do
+  maybet <- getV (mLookup p)
+  case maybet of
+    Just (VarT p') -> resolve (VarT p')
+    Just t -> return t
+    Nothing -> return $ VarT p
+resolve t = return t
 
-constructFnDef :: TypeEnv -> FnDef -> TypeEnv
-constructFnDef (ne, ie) (FnDef name params body) = (newNE, newIE)
-  where
-    (retType, ie1) = newType ie
-    (paramTypes, newIE) = mapAccumL (\ie _ -> newType ie) ie1 params
-    fType = multiArrT retType paramTypes
-    newNE = ne `bindF` (name, fType)
+instantiate :: PType -> TState MType
+instantiate (Forall pset t) = do
+  let plist = sToList pset
+  tparams <- newTypeVars (length plist)
+  return $ substitute (mFromList $ zip plist tparams) t
 
-inferDataDef :: TypeEnv -> DataDef -> TypeEnv
-inferDataDef (ne, ie) (DataDef name constrs) = (newNE, ie)
-  where
-    dType = DataT name
-    newNE = foldl inferConstr ne (zip (repeat dType) constrs)
-    inferConstr :: NameEnv -> (MType, Constructor) -> NameEnv
-    inferConstr env (dType, (name, tss)) = newEnv
-      where
-        cType = multiArrT dType (map (typeSigToType env) tss)
-        newEnv = env `bindC` (name, cType)
-    typeSigToType :: NameEnv -> TypeSig -> MType
-    typeSigToType env (AtomTS name) = mLookup (dm env) name (error $ "undefined type " ++ name)
-    typeSigToType env (ArrTS ts1 ts2) = ArrT (typeSigToType env ts1) (typeSigToType env ts2)
-
-inferFnDef :: TypeEnv -> FnDef -> TypeEnv
-inferFnDef (ne, ie) (FnDef name params body) = (ne, newIE)
-  where
-    fType = mLookup (fm ne) name (error $ "can not find type of " ++ name)
-    (binds, retType) = paramBind params fType
-    tmpNE = foldl bindF ne binds
-    (bType, ie1) = inferExpr tmpNE ie body
-    newIE = unify ie1 (retType, bType)
-    
-infer :: Program -> String
-infer (dataDefs, fnDefs) = envStr
-  where 
-    e1 = foldl constructDataDef initialTypeEnv dataDefs
-    e2 = foldl constructFnDef e1 fnDefs
-    e3 = foldl inferDataDef e2 dataDefs
-    e4 = foldl inferFnDef e3 fnDefs
-    envStr = envShow e4
-
-recResolve :: InferEnv -> MType -> MType
-recResolve ie (VarT p) =
-  case mLookupMaybe (vm ie) p of
-    Just t -> recResolve ie t
+substitute :: Map Int MType -> MType -> MType
+substitute smap t = case t of
+  VarT p -> case mLookup p smap of
+    Just t -> t
     Nothing -> VarT p
-recResolve ie (ArrT t1 t2) = ArrT (recResolve ie t1) (recResolve ie t2) 
-recResolve _ t = t
+  ArrT l r -> ArrT (subst l) (subst r)
+  DataT n ts -> DataT n (map subst ts)
+  where subst = substitute smap
 
-resolveMap :: InferEnv -> Map String MType -> Map String MType
-resolveMap ie = fmap $ recResolve ie
+unify :: MType -> MType -> TState ()
+unify l r = do
+  lt <- resolve l
+  rt <- resolve r
+  case (lt, rt) of
+    (VarT p, t) -> unifyP p t
+    (t, VarT p) -> unifyP p t
+    (ArrT ll lr, ArrT rl rr) -> do
+      unify ll rl
+      unify lr rr
+    (DataT n1 ts1, DataT n2 ts2) ->
+      if n1 == n2 then
+        traverse_ (uncurry unify) (zip ts1 ts2)
+      else
+        unifyError n1 n2
+    (lt, rt) -> unifyError (show lt) (show rt)
 
-envShow :: TypeEnv -> String
-envShow (ne, ie) =
-  "Functions: \n" ++ show (resolveMap ie (fm ne)) ++ "\n\n" ++
-  "Data types: \n" ++ show (resolveMap ie (dm ne)) ++ "\n\n" ++
-  "Constructors: \n" ++ show (resolveMap ie (cm ne)) ++ "\n"
+unifyP :: Int -> MType -> TState ()
+unifyP p t = case t of
+  VarT p1 | p == p1 -> return ()
+  t | recCheck p t -> unifyError (show p) (show t)
+    | otherwise -> bindV (p, t)
+  where
+    recCheck p (VarT p1) = p == p1
+    recCheck p (ArrT l r) = recCheck p l || recCheck p r
+    recCheck p (DataT _ ts) = foldl (\b t -> b || recCheck p t) False ts
 
-initialNameEnv :: NameEnv
-initialNameEnv = NameEnv
-  { fm = primFn,
-    dm = primData,
-    cm = primConstr
-  }
+unifyError s1 s2 = typeError $ "can not unify " ++ s1 ++ " with " ++ s2
 
-initialInferEnv :: InferEnv
-initialInferEnv = InferEnv
-  {  vm = emptyMap,
-    cnt = 0
-  }
+generalize :: MType -> TState PType
+generalize t = do
+  rt <- deepResolve t
+  return (Forall (freeVarsR rt) rt)
+  where
+    freeVarsR :: MType -> Set Int
+    freeVarsR (VarT p) = sSingleton p
+    freeVarsR (ArrT l r) = freeVarsR l `sUnion` freeVarsR r
+    freeVarsR (DataT n ts) = foldl sUnion emptySet (map freeVarsR ts)
 
-initialTypeEnv :: TypeEnv
-initialTypeEnv = (initialNameEnv, initialInferEnv)
-
-boolT, listT :: MType
-boolT = DataT "Bool"
-listT = DataT "List"
+mIntT, mBoolT :: MType
+mIntT = DataT "Int" []
+mBoolT = DataT "Bool" []
 
 primFn :: FTMap
 primFn = mFromList
-  [ ("add", ArrT IntT  (ArrT IntT IntT)),
-    ("sub", ArrT IntT  (ArrT IntT IntT)),
-    ("mul", ArrT IntT  (ArrT IntT IntT)),
-    ("div", ArrT IntT  (ArrT IntT IntT)),
-    ("rem", ArrT IntT  (ArrT IntT IntT)),
-    ("eq",  ArrT IntT  (ArrT IntT boolT)),
-    ("gt",  ArrT IntT  (ArrT IntT boolT)),
-    ("lt",  ArrT IntT  (ArrT IntT boolT)),
-    ("ne",  ArrT IntT  (ArrT IntT boolT)),
-    ("ge",  ArrT IntT  (ArrT IntT boolT)),
-    ("le",  ArrT IntT  (ArrT IntT boolT)),
-    ("and", ArrT boolT (ArrT boolT boolT)),
-    ("or",  ArrT boolT (ArrT boolT boolT)),
-    ("not", ArrT boolT boolT)
+  [ ("add", Forall emptySet $ ArrT mIntT (ArrT mIntT mIntT)),
+    ("sub", Forall emptySet $ ArrT mIntT (ArrT mIntT mIntT)),
+    ("mul", Forall emptySet $ ArrT mIntT (ArrT mIntT mIntT)),
+    ("div", Forall emptySet $ ArrT mIntT (ArrT mIntT mIntT)),
+    ("rem", Forall emptySet $ ArrT mIntT (ArrT mIntT mIntT)),
+    ("eq",  Forall emptySet $ ArrT mIntT (ArrT mIntT mBoolT)),
+    ("gt",  Forall emptySet $ ArrT mIntT (ArrT mIntT mBoolT)),
+    ("lt",  Forall emptySet $ ArrT mIntT (ArrT mIntT mBoolT)),
+    ("ne",  Forall emptySet $ ArrT mIntT (ArrT mIntT mBoolT)),
+    ("ge",  Forall emptySet $ ArrT mIntT (ArrT mIntT mBoolT)),
+    ("le",  Forall emptySet $ ArrT mIntT (ArrT mIntT mBoolT)),
+    ("or",  Forall emptySet $ ArrT mBoolT (ArrT mBoolT mBoolT)),
+    ("and", Forall emptySet $ ArrT mBoolT (ArrT mBoolT mBoolT)),
+    ("not", Forall emptySet $ ArrT mBoolT mBoolT)
   ]
 
 primData :: DTMap
 primData = mFromList
-  [ ("Int",  IntT),
-    ("List", listT),
-    ("Bool", boolT)
+  [ ("Int",  0),
+    ("Bool", 0),
+    ("List", 1)
   ]
 
 primConstr :: CTMap
 primConstr = mFromList
-  [ ("False", boolT),
-    ("True",  boolT),
-    ("Nil",   listT),
-    ("Cons",  ArrT IntT (ArrT listT listT))
+  [ ("False", Forall emptySet mBoolT),
+    ("True",  Forall emptySet mBoolT),
+    ("Nil",   Forall (sSingleton 0) $ DataT "List" [VarT 0]),
+    ("Cons",  Forall (sSingleton 0) $ ArrT (VarT 0) $ ArrT (DataT "List" [VarT 0]) (DataT "List" [VarT 0]))
   ]

@@ -1,20 +1,20 @@
-if b x y = case b of
+ifte b x y = case b of
   { True  -> x
   ; False -> y
   };
 
 take n l = case l of
   { Nil -> Nil
-  ; Cons h t -> if (eq 0 n) Nil (Cons h (take (sub n 1) t))
+  ; Cons h t -> ifte (eq 0 n) Nil (Cons h (take (sub n 1) t))
   };
 
 map f l = case l of
   { Nil -> Nil
-  ; Cons h t -> Cons (f h) t
+  ; Cons h t -> Cons (f h) (map f t)
   };
 
 nats = Cons 0 (map (add 1) nats);
 
-isEven n = if (eq 0 (rem n 2)) 1 0;
+isEven n = ifte (eq 0 (rem n 2)) 1 0;
 
 start n = take n (map isEven nats);
