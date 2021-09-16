@@ -41,9 +41,6 @@ instance Alternative (Parser i) where
       r@(Just (_, _)) -> r
       Nothing -> p2 is
 
--- instance MonadFail (Parser i) where
---   fail = error
-
 pitem :: Parser i i
 pitem = Parser $ \case
   t : ts -> Just (t, ts)

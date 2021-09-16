@@ -11,7 +11,7 @@ template :: FilePath
 template = "template.c"
 
 dstFile :: FilePath
-dstFile = "build\\main.c"
+dstFile = "build/main.c"
 
 main :: IO ()
 main = do

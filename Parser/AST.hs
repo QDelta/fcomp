@@ -6,8 +6,6 @@ data TypeSig
   | ArrTS TypeSig TypeSig
   deriving (Show)
 
--- Pair (a -> b) c = App (App Pair (Arr a b)) c
-
 data Expr
   = IntE Int
   | VarE String

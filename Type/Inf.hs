@@ -62,21 +62,16 @@ getL f = getEnv (f . ltmap)
 getV f = getEnv (f . vtmap)
 
 -- set : (Map -> Map) -> TState ()
-setD f = State $ \env -> 
-  let newEnv = env { dtmap = f (dtmap env) }
-  in ((), newEnv) -- { dblog = dblog newEnv ++ ["D " ++ show newEnv] })
-setF f = State $ \env -> 
-  let newEnv = env { ftmap = f (ftmap env) }
-  in ((), newEnv) -- { dblog = dblog newEnv ++ ["F " ++ show newEnv] })
-setC f = State $ \env -> 
-  let newEnv = env { ctmap = f (ctmap env) }
-  in ((), newEnv) -- { dblog = dblog newEnv ++ ["C " ++ show newEnv] })
-setL f = State $ \env -> 
-  let newEnv = env { ltmap = f (ltmap env) }
-  in ((), newEnv) -- { dblog = dblog newEnv ++ ["L " ++ show newEnv] })
-setV f = State $ \env -> 
-  let newEnv = env { vtmap = f (vtmap env) }
-  in ((), newEnv) -- { dblog = dblog newEnv ++ ["V " ++ show newEnv] })
+setD f = State $ 
+  \env -> ((), env { dtmap = f (dtmap env) })
+setF f = State $ 
+  \env -> ((), env { ftmap = f (ftmap env) })
+setC f = State $ 
+  \env -> ((), env { ctmap = f (ctmap env) })
+setL f = State $ 
+  \env -> ((), env { ltmap = f (ltmap env) })
+setV f = State $ 
+  \env -> ((), env { vtmap = f (vtmap env) })
 
 bindD p = setD (mInsert p)
 bindF p = setF (mInsert p)
@@ -86,12 +81,8 @@ bindV p = setV (mInsert p)
 
 newTypeVar :: TState MType
 newTypeVar = State $
-  \env -> 
-    let 
-      id = index env
-      newEnv = env { index = id + 1 }
-    in
-      (VarT id, newEnv) --newEnv { dblog = dblog newEnv ++ ["NV " ++ show newEnv] })
+  \env -> let id = index env
+  in (VarT id, env { index = id + 1 })
 
 newTypeVars :: Int -> TState [MType]
 newTypeVars n = traverse (const newTypeVar) (replicate n ())
