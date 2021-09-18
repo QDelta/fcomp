@@ -1,4 +1,4 @@
-module Type.Inf where
+module Type.Inf (infer) where
 
 import Data.Graph (SCC, stronglyConnComp, flattenSCC)
 import Data.Foldable (traverse_)

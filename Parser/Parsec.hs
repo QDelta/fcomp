@@ -21,8 +21,7 @@ instance Monad (Parser i) where
   return a = Parser $ \is -> Just (a, is)
   (Parser pa) >>= f = Parser $ \is ->
     case pa is of
-      Just (a, rest) -> pb rest
-        where Parser pb = f a
+      Just (a, rest) -> runParser (f a) rest
       Nothing -> Nothing
 
 instance Functor (Parser i) where

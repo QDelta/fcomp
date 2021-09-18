@@ -1,9 +1,9 @@
-module Type.CoreGen where
+module Core.Gen (genCore) where
 
 import Utils.Function
 import Utils.Map
 import Parser.AST
-import Type.CoreDef
+import Core.Def
 
 initialCore :: CoreProgram 
 initialCore = 

@@ -1,12 +1,17 @@
-module GM.Compile where
+module GM.Compile 
+  ( CompiledCoreConstr,
+    CompiledCoreFn,
+    CompiledCore,
+    compile
+  ) where
 
 import Utils.Function
 import Utils.Map
-import Type.CoreDef
+import Core.Def
 import GM.Def
 
 type Frame = ([Int], Int)
--- bindings in stack: (top) $5, $6, $2, $3, $4, $0, $1 (bottom)
+-- bindings on stack: (top) $5, $6, $2, $3, $4, $0, $1 (bottom)
 -- => fst Frame = [5, 2]
 --    snd Frame = length [$5, $6] = 2
 
@@ -22,7 +27,7 @@ pushStack (ms, count) n = (newMin : ms, n)
   where newMin = count + getTop ms
 
 popStack :: Frame -> Frame
-popStack ([], _) = ([], 0) -- dummy
+popStack ([], _) = ([], 0)
 popStack (min : rest, count) = (rest, newCount)
   where newCount = min - getTop rest
 
@@ -85,7 +90,7 @@ compileWHNF f (AppCE (AppCE (GVarCE op) e1) e2) | op `mElem` strictBinFns =
   compileWHNF f e2 ++ compileWHNF (pushStack f 1) e1 ++ [assertJust $ mLookup op strictBinFns]
 compileWHNF f e = compileLazy f e ++ [Eval]
 
--- TODO: lazy case: generate a function
+-- TODO: lazy case: generate a function (lambda lifting)
 compileLazy :: Frame -> CoreExpr -> Code
 compileLazy _ (GVarCE name) = [PushG name]
 compileLazy f (LVarCE i) = [Push (getOffset f i)]
@@ -116,19 +121,10 @@ compiledPrimFn = compiledStrictFns ++
   [ ("and", 2, [Push 0, Eval, Jump [(0, [Pop 1, Pack 0 0]), (1, [Pop 1, Push 1, Eval])], Update 2, Pop 2]),
     ("or",  2, [Push 0, Eval, Jump [(0, [Pop 1, Push 1, Eval]), (1, [Pop 1, Pack 1 0])], Update 2, Pop 2])
   ]
--- (def (and x y) (case x (False False) (True  y)))
--- (def (or  x y) (case x (True  True ) (False y)))
+-- and x y = case x of { False -> False; True -> y };
+-- or x y = case x of { True -> True; False -> y };
 
 type CompiledCore = ([CompiledCoreConstr], [CompiledCoreFn])
 
 compile :: CoreProgram -> CompiledCore
 compile (cs, fs) = (map compileConstr cs, compiledPrimFn ++ map compileFn fs)
-
-initGlobals :: CompiledCore -> [(String, Node)]
-initGlobals (cs, fs) = map initConstr cs ++ map initFn fs
-
-initConstr :: CompiledCoreConstr -> (String, Node)
-initConstr (n, a, _, c) = (n, NGlobal a c)
-
-initFn :: CompiledCoreFn -> (String, Node)
-initFn (n, a, c) = (n, NGlobal a c)

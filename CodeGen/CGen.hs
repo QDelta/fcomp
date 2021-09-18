@@ -1,10 +1,19 @@
-module CodeGen.CGen where
+module CodeGen.CGen (codeGen) where
 
 import Utils.Map
 import GM.Compile
 import GM.Def
 
 type CCode = String
+
+initGlobals :: CompiledCore -> [(String, Node)]
+initGlobals (cs, fs) = map initConstr cs ++ map initFn fs
+
+initConstr :: CompiledCoreConstr -> (String, Node)
+initConstr (n, a, _, c) = (n, NGlobal a c)
+
+initFn :: CompiledCoreFn -> (String, Node)
+initFn (n, a, c) = (n, NGlobal a c)
 
 codeGen :: CompiledCore -> CCode
 codeGen p =
@@ -38,10 +47,10 @@ genInitGlobal nnl =
 
 allocInitGlobal :: (String, Node) -> CCode
 allocInitGlobal (name, NGlobal arity _) =
-  "ga = mem_alloc();\n" ++
-  "mem(ga)->type = NGlobal;\n" ++
-  "mem(ga)->g_arity = " ++ show arity ++ ";\n" ++
-  "mem(ga)->code = " ++ mangle name ++ ";\n" ++
+  "ga = node_alloc_nogc();\n" ++
+  "NODE(ga)->type = NGlobal;\n" ++
+  "NODE(ga)->g_arity = " ++ show arity ++ ";\n" ++
+  "NODE(ga)->code = " ++ mangle name ++ ";\n" ++
   mangleAddr name ++ " = ga;\n" ++
   assignStartAddr
   where
@@ -100,7 +109,7 @@ genInstr IsLe =
 genInstr Not =
   "inst_not();\n"
 genInstr (Jump brs) =
-  "switch (mem(STACK_TOP)->tag) {\n" ++
+  "switch (NODE(STACK_TOP)->tag) {\n" ++
   concatMap genCase brs ++
   "default: fprintf(stderr, \"Non-exhaustive pattern\"); exit_program();\n" ++
   "};\n"

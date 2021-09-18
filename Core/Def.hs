@@ -1,4 +1,4 @@
-module Type.CoreDef where
+module Core.Def where
 
 -- Core is not strongly typed
 

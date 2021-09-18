@@ -5,11 +5,13 @@ ifte b x y = case b of
 
 from n = Cons n (from (add 1 n));
 
-notDivide p n = not (eq 0 (rem n p));
+notDivide p n = ne 0 (rem n p);
+
+id x = x;
 
 filter f l = case l of
   { Nil -> Nil
-  ; Cons h t -> ifte (f h) (Cons h (filter f t)) (filter f t)
+  ; Cons h t -> (ifte (f h) (Cons h) id) (filter f t)
   };
 
 sieve l = case l of

@@ -3,22 +3,24 @@ module Main where
 import System.Environment (getArgs)
 import Parser.Parser
 import Type.Inf
-import Type.CoreGen
+import Core.Gen
 import GM.Compile
+import GM.Optimize
 import CodeGen.CGen
 
-template :: FilePath
-template = "template.c"
+runtimeC :: FilePath
+runtimeC = "vm.c"
 
-dstFile :: FilePath
-dstFile = "build/main.c"
+defaultDstFile :: FilePath
+defaultDstFile = "build/main.c"
 
 main :: IO ()
 main = do
-  srcFile : _ <- getArgs 
+  srcFile : restArgs <- getArgs
+  let dstFile = case restArgs of { [] -> defaultDstFile; h : _ -> h }
   progText <- readFile srcFile
-  template <- readFile template
+  rtCode <- readFile runtimeC
   let prog = parse progText
-  let code = (codeGen . compile . genCore) prog
+  let code = (codeGen . optimize . compile . genCore) prog
   putStrLn $ infer prog
-  writeFile dstFile (template ++ code)
+  writeFile dstFile (rtCode ++ code)
