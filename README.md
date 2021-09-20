@@ -25,7 +25,7 @@ A compiler for a statically typed, purely functional programming language with l
 
 ```bash
 make
-./Main examples/nprime.src build/main.c
+build/fcomp examples/nprime.src
 gcc -O2 build/main.c -o build/main
 echo "64" | build/main
 ```

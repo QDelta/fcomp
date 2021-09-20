@@ -1,8 +1,11 @@
-OUTPUT=build
+ODIR=build
 
-Main: 
-	ghc --make -O2 Main.hs -outputdir ${OUTPUT}
+all: fcomp
 
-test: Main
+fcomp: $(ODIR)
+	ghc --make -O2 Main.hs -outputdir $(ODIR) -o $(ODIR)/fcomp
 
-.PHONY: Main test
+$(ODIR):
+	mkdir $(ODIR)
+
+.PHONY: fcomp

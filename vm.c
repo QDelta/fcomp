@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -9,7 +10,7 @@ typedef char bool_t;
 #define FALSE 0
 #define TRUE  1
 
-typedef long addr_t;
+typedef int64_t addr_t;
 
 typedef void (*func_t)(void);
 
@@ -43,21 +44,21 @@ void exit_program(void);
 typedef struct {
     enum {Vacant, Occupied} slot_tag;
     union {
-        long next_vacant;
+        int64_t next_vacant;
         node_t node;
     };
 } slot_t;
 
 slot_t *slab_arr = NULL;
-long slab_first_vacant_id;
-long slab_size;
-long slab_cap;
-long slab_occupied_count;
-long slab_gc_threshold;
+int64_t slab_first_vacant_id;
+int64_t slab_size;
+int64_t slab_cap;
+int64_t slab_occupied_count;
+int64_t slab_gc_threshold;
 
-long stat_gc_count = 0;
-// long stat_alloc_count = 0;
-// long stat_free_count = 0;
+int64_t stat_gc_count = 0;
+int64_t stat_alloc_count = 0;
+int64_t stat_free_count = 0;
 
 void slab_init(void) {
     slab_arr = malloc(SLAB_INIT_CAP * sizeof(slot_t));
@@ -87,7 +88,7 @@ addr_t slab_alloc(void) {
     slab_arr[new_addr].slot_tag = Occupied;
     slab_occupied_count += 1;
 
-    // stat_alloc_count += 1;
+    stat_alloc_count += 1;
     return new_addr;
 }
 
@@ -98,11 +99,11 @@ void slab_free(addr_t a) {
     slab_first_vacant_id = a;
     slab_occupied_count -= 1;
 
-    // stat_free_count += 1;
+    stat_free_count += 1;
 }
 
 void slab_destroy(void) {
-    for (long i = 0; i < slab_size; ++i) {
+    for (int64_t i = 0; i < slab_size; ++i) {
         if (slab_arr[i].slot_tag == Occupied) {
             free_node(slab_arr[i].node);
         }
@@ -129,9 +130,9 @@ addr_t node_alloc(void) {
 void global_init(void);
 
 addr_t *stack_arr = NULL;
-long stack_bp;
-long stack_sp;
-long stack_cap;
+int64_t stack_bp;
+int64_t stack_sp;
+int64_t stack_cap;
 
 #define STACK_OFFSET(n) (stack_arr[stack_sp - 1 - (n)])
 #define STACK_TOP (stack_arr[stack_sp - 1])
@@ -165,16 +166,16 @@ void stack_push(addr_t a) {
 }
 
 void stack_traverse(void (*f)(addr_t)) {
-    long sp = stack_sp;
-    long bp = stack_bp;
+    int64_t sp = stack_sp;
+    int64_t bp = stack_bp;
     while (bp > 0) {
-        for (long i = sp - 1; i >= bp; --i) {
+        for (int64_t i = sp - 1; i >= bp; --i) {
             f(stack_arr[i]);
         }
         sp = bp - 1;
-        bp = (long)stack_arr[sp];
+        bp = (int64_t)stack_arr[sp];
     }
-    for (long i = sp - 1; i >= 0; --i) {
+    for (int64_t i = sp - 1; i >= 0; --i) {
         f(stack_arr[i]);
     }
 }
@@ -202,7 +203,7 @@ void gc_track(addr_t a) {
 
 void global_gc(void) {
     stack_traverse(gc_track);
-    for (long i = slab_size - 1; i >= 0; --i) {
+    for (int64_t i = slab_size - 1; i >= 0; --i) {
         if (slab_arr[i].slot_tag == Occupied 
             && slab_arr[i].node.type != NGlobal) {
             if (! slab_arr[i].node.gc_reachable)
@@ -215,8 +216,8 @@ void global_gc(void) {
 }
 
 void print_stat(void) {
-    // printf("Slab: Alloc count: %ld\n", stat_alloc_count);
-    // printf("Slab: Free count: %ld\n", stat_free_count);
+    printf("Slab: Alloc count: %ld\n", stat_alloc_count);
+    printf("Slab: Free count: %ld\n", stat_free_count);
     printf("Slab: Now size: %ld\n", slab_size);
     printf("Slab: Now capacity: %ld\n", slab_cap);
     printf("Slab: Now occupied: %ld\n", slab_occupied_count);
@@ -307,14 +308,14 @@ void inst_unwind(void) {
                     NODE(a)->code();
                 } else {
                     stack_sp = stack_bp;
-                    stack_bp = (long)STACK_TOP;
+                    stack_bp = (int64_t)STACK_TOP;
                     STACK_TOP = stack_arr[stack_sp];
                     return;
                 }
                 break;
             default:
                 stack_sp = stack_bp;
-                stack_bp = (long)STACK_TOP;
+                stack_bp = (int64_t)STACK_TOP;
                 STACK_TOP = a;
                 return;
         }
