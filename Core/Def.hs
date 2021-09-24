@@ -7,7 +7,8 @@ data CoreExpr
   | LVarCE Int
   | IntCE  Int
   | AppCE CoreExpr CoreExpr
-  | CaseCE CoreExpr [CoreBranch]
+  | CaseDCE CoreExpr [CoreBranch]
+  | CaseICE CoreExpr [CoreBranch]
   deriving (Show)
 
 type CoreBranch = (Int, Int, CoreExpr)  -- arity, tag, body

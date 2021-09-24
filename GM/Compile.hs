@@ -38,39 +38,43 @@ getOffset f@(ms, count) n =
     min = getTop ms
     nextOffset = getOffset (popStack f) n
 
-strictFnList :: [(String, Int, Instruction)]
-strictFnList = 
-  [ ("add", 2, Add ),
-    ("sub", 2, Sub ),
-    ("mul", 2, Mul ),
-    ("div", 2, Div ),
-    ("rem", 2, Rem ),
-    ("eq",  2, IsEq),
-    ("lt",  2, IsLt),
-    ("gt",  2, IsGt),
-    ("ne",  2, IsNe),
-    ("le",  2, IsLe),
-    ("ge",  2, IsGe),
-    ("not", 1, Not )
+primInt2 :: [(String, Instruction)]
+primInt2 =
+  [ ("add", Add),
+    ("sub", Sub),
+    ("mul", Mul),
+    ("div", Div),
+    ("rem", Rem)
   ]
 
-filterArity :: Int -> [(String, Int, Instruction)] -> Map String Instruction
-filterArity n =
-  mFromList . map (\(a, b, c) -> (a, c)) . filter (\(a, b, c) -> b == n)
+primBool2 :: [(String, Instruction)]
+primBool2 =
+  [ ("eq", IsEq),
+    ("lt", IsLt),
+    ("gt", IsGt),
+    ("ne", IsNe),
+    ("le", IsLe),
+    ("ge", IsGe)
+  ]
 
--- TODO: a general matcher for strict ops
-strictBinFns :: Map String Instruction
-strictBinFns = filterArity 2 strictFnList
+primBool1 :: [(String, Instruction)]
+primBool1 =
+  [ ("not", Not)
+  ]
 
-strictUnaryFns :: Map String Instruction
-strictUnaryFns = filterArity 1 strictFnList
+prim2 :: [(String, Instruction)]
+prim2 = primInt2 ++ primBool2
 
-compileStrictFn :: (String, Int, Instruction) -> CompiledCoreFn
-compileStrictFn (name, arity, inst) =
+prim1 :: [(String, Instruction)]
+prim1 = primBool1
+
+compilePrimFn :: Int -> (String, Instruction) -> CompiledCoreFn
+compilePrimFn arity (name, inst) =
   (name, arity, concat (replicate arity [Push (arity - 1), Eval]) ++ [inst, Update arity, Pop arity])
 
-compiledStrictFns :: [CompiledCoreFn]
-compiledStrictFns = map compileStrictFn strictFnList
+compiledPrimFns :: [CompiledCoreFn]
+compiledPrimFns = 
+  map (compilePrimFn 2) (primInt2 ++ primBool2) ++ map (compilePrimFn 1) primBool1
 
 type CompiledCoreFn = (String, Int, Code)
 
@@ -80,14 +84,33 @@ compileFn (n, a, b) = (n, a, code ++ clean)
     code = compileWHNF (initialFrame a) b
     clean = [Update a, Pop a]
 
--- Simple strictness analysis
+-- eval expr to a value on v-stack
+compileVal :: Frame -> CoreExpr -> Code
+compileVal _ (IntCE n) = [PushV n]
+compileVal f e@(AppCE (GVarCE op) opr) =
+  case lookup op prim1 of
+    Just inst -> compileVal f opr ++ [inst]
+    Nothing -> compileWHNF f e ++ [Eval]
+compileVal f e@(AppCE (AppCE (GVarCE op) opr1) opr2) =
+  case lookup op prim2 of
+    Just inst -> compileVal f opr2 ++ compileVal f opr1 ++ [inst]
+    Nothing -> compileWHNF f e ++ [Eval]
+compileVal f e = compileWHNF f e ++ [Load]
+
+-- eval expr to WHNF on a-stack
 compileWHNF :: Frame -> CoreExpr -> Code
 compileWHNF _ (IntCE n) = [PushI n]
-compileWHNF f (CaseCE e brs) = compileWHNF f e ++ [Jump (compileBranches f brs)]
-compileWHNF f (AppCE (GVarCE op) e) | op `mElem` strictUnaryFns =
-  compileWHNF f e ++ [assertJust $ mLookup op strictUnaryFns]
-compileWHNF f (AppCE (AppCE (GVarCE op) e1) e2) | op `mElem` strictBinFns =
-  compileWHNF f e2 ++ compileWHNF (pushStack f 1) e1 ++ [assertJust $ mLookup op strictBinFns]
+compileWHNF f (CaseDCE e brs) = compileWHNF f e ++ [Jump (compileBranches f brs)]
+compileWHNF f e@(AppCE (GVarCE op) opr) =
+  case lookup op prim1 of
+    Just inst -> compileWHNF f opr ++ [inst]
+    Nothing -> compileLazy f e ++ [Eval]
+  -- compileWHNF f e ++ [assertJust $ mLookup op strictUnaryFns]
+compileWHNF f e@(AppCE (AppCE (GVarCE op) opr1) opr2) =
+  case lookup op prim2 of
+    Just inst -> compileWHNF f opr2 ++ compileWHNF (pushStack f 1) opr1 ++ [inst]
+    Nothing -> compileLazy f e ++ [Eval]
+  -- compileWHNF f e2 ++ compileWHNF (pushStack f 1) e1 ++ [assertJust $ mLookup op strictBinFns]
 compileWHNF f e = compileLazy f e ++ [Eval]
 
 -- TODO: lazy case: generate a function (lambda lifting)
@@ -97,7 +120,7 @@ compileLazy f (LVarCE i) = [Push (getOffset f i)]
 compileLazy _ (IntCE n) = [PushI n]
 compileLazy f (AppCE e1 e2) = 
   compileLazy f e2 ++ compileLazy (pushStack f 1) e1 ++ [MkApp]
-compileLazy f (CaseCE e brs) = 
+compileLazy f (CaseDCE e brs) = 
   error "case expression in lazy environment are not implemented yet, use a function to wrap it."
 
 compileBranches :: Frame -> [CoreBranch] -> [(Int, Code)]
@@ -117,7 +140,7 @@ compileConstr (name, arity, tag) =
   where pushP = replicate arity (Push (arity - 1))
 
 compiledPrimFn :: [CompiledCoreFn] -- name, arity, code
-compiledPrimFn = compiledStrictFns ++
+compiledPrimFn = compiledPrimFns ++
   [ ("and", 2, [Push 0, Eval, Jump [(0, [Pop 1, Pack 0 0]), (1, [Pop 1, Push 1, Eval])], Update 2, Pop 2]),
     ("or",  2, [Push 0, Eval, Jump [(0, [Pop 1, Push 1, Eval]), (1, [Pop 1, Pack 1 0])], Update 2, Pop 2])
   ]

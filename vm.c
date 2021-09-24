@@ -3,38 +3,42 @@
 #include <stdlib.h>
 
 #define STACK_INIT_CAP 16
+#define DUMP_INIT_CAP 16
 #define SLAB_INIT_CAP 128
 #define GC_INIT_THRESHOLD 64
 
-typedef char bool_t;
-#define FALSE 0
-#define TRUE  1
-
+typedef unsigned char byte_t;
 typedef int64_t addr_t;
 
 typedef void (*func_t)(void);
 
 typedef struct {
-    enum {NApp, NGlobal, NInd, NData, NInt} type;
     union {
-        // NApp
-        struct { addr_t left; addr_t right; };
-        // NGlobal
-        struct { int g_arity; func_t code; };
-        // NInd
-        struct { addr_t to; };
-        // NData
-        struct { int tag; int d_arity; addr_t* params; };
-        // NInt
-        struct { int intv; };
+        struct { addr_t left; addr_t right; }; // application
+        struct { int64_t g_arity; func_t code; }; // global
+        struct { addr_t to; }; // indirection
+        struct { int64_t tag; int64_t d_arity; addr_t *d_params; }; // data
+        struct { int64_t intv; }; // int
     };
-    bool_t gc_reachable;
+    byte_t type;
+    byte_t gc_reachable;
+    byte_t gc_isglobal;
 } node_t;
+
+#define FALSE 0
+#define TRUE  1
+
+// node types
+#define NAPP    0
+#define NGLOBAL 1
+#define NIND    2
+#define NDATA   3
+#define NINT    4
 
 // free allocated memory in a node
 void free_node(node_t n) {
-    if (n.type == NData) {
-        free(n.params);
+    if (n.type == NDATA) {
+        free(n.d_params);
     }
 }
 
@@ -42,12 +46,16 @@ void global_gc(void);
 void exit_program(void);
 
 typedef struct {
-    enum {Vacant, Occupied} slot_tag;
     union {
         int64_t next_vacant;
         node_t node;
     };
+    byte_t slot_tag;
 } slot_t;
+
+// slot tags
+#define VACANT   0
+#define OCCUPIED 1
 
 slot_t *slab_arr = NULL;
 int64_t slab_first_vacant_id;
@@ -85,7 +93,7 @@ addr_t slab_alloc(void) {
         slab_first_vacant_id = v_slot.next_vacant;
     }
 
-    slab_arr[new_addr].slot_tag = Occupied;
+    slab_arr[new_addr].slot_tag = OCCUPIED;
     slab_occupied_count += 1;
 
     stat_alloc_count += 1;
@@ -94,7 +102,7 @@ addr_t slab_alloc(void) {
 
 void slab_free(addr_t a) {
     free_node(slab_arr[a].node);
-    slab_arr[a].slot_tag = Vacant;
+    slab_arr[a].slot_tag = VACANT;
     slab_arr[a].next_vacant = slab_first_vacant_id;
     slab_first_vacant_id = a;
     slab_occupied_count -= 1;
@@ -104,7 +112,7 @@ void slab_free(addr_t a) {
 
 void slab_destroy(void) {
     for (int64_t i = 0; i < slab_size; ++i) {
-        if (slab_arr[i].slot_tag == Occupied) {
+        if (slab_arr[i].slot_tag == OCCUPIED) {
             free_node(slab_arr[i].node);
         }
     }
@@ -116,6 +124,7 @@ void slab_destroy(void) {
 addr_t node_alloc_nogc(void) {
     addr_t a = slab_alloc();
     NODE(a)->gc_reachable = FALSE;
+    NODE(a)->gc_isglobal = FALSE;
     return a;
 }
 
@@ -143,20 +152,6 @@ void stack_init(void) {
     stack_cap = STACK_INIT_CAP;
 }
 
-void stack_free(void) {
-    free(stack_arr);
-    stack_arr = NULL;
-    stack_bp = stack_sp = stack_cap = 0;
-}
-
-void exit_program(void) {
-    fflush(stderr);
-    fflush(stdout);
-    stack_free();
-    slab_destroy();
-    exit(0);
-}
-
 void stack_push(addr_t a) {
     if (stack_sp == stack_cap) {
         stack_cap *= 2;
@@ -165,47 +160,86 @@ void stack_push(addr_t a) {
     stack_arr[stack_sp++] = a;
 }
 
-void stack_traverse(void (*f)(addr_t)) {
-    int64_t sp = stack_sp;
-    int64_t bp = stack_bp;
-    while (bp > 0) {
-        for (int64_t i = sp - 1; i >= bp; --i) {
-            f(stack_arr[i]);
-        }
-        sp = bp - 1;
-        bp = (int64_t)stack_arr[sp];
+int64_t *dump_arr;
+int64_t dump_sp;
+int64_t dump_cap;
+
+#define DUMP_TOP (dump_arr[dump_sp - 1])
+
+void dump_init(void) {
+    dump_arr = malloc(DUMP_INIT_CAP * sizeof(int64_t));
+    dump_sp = 0;
+    dump_cap = DUMP_INIT_CAP;
+}
+
+void dump_push(int64_t bp) {
+    if (dump_sp == dump_cap) {
+        dump_cap *= 2;
+        dump_arr = realloc(dump_arr, dump_cap * sizeof(int64_t));
     }
-    for (int64_t i = sp - 1; i >= 0; --i) {
-        f(stack_arr[i]);
+    dump_arr[dump_sp++] = bp;
+}
+
+void exit_program(void) {
+    fflush(stderr);
+    fflush(stdout);
+    free(stack_arr);
+    free(dump_arr);
+    slab_destroy();
+    exit(0);
+}
+
+
+// void stack_traverse(void (*f)(addr_t)) {
+//     int64_t sp = stack_sp;
+//     int64_t bp = stack_bp;
+//     while (bp > 0) {
+//         for (int64_t i = sp - 1; i >= bp; --i) {
+//             f(stack_arr[i]);
+//         }
+//         sp = bp - 1;
+//         bp = (int64_t)stack_arr[sp];
+//     }
+//     for (int64_t i = sp - 1; i >= 0; --i) {
+//         f(stack_arr[i]);
+//     }
+// }
+
+void gc_track_children(addr_t a);
+
+void gc_track(addr_t a) {
+    if (! NODE(a)->gc_isglobal && ! NODE(a)->gc_reachable) {
+        NODE(a)->gc_reachable = TRUE;
+        gc_track_children(a);
     }
 }
 
-void gc_track(addr_t a) {
-    if (NODE(a)->type != NGlobal && ! NODE(a)->gc_reachable) {
-        NODE(a)->gc_reachable = TRUE;
-        switch (NODE(a)->type) {
-            case NApp:
-                gc_track(NODE(a)->left);
-                gc_track(NODE(a)->right);
-                break;
-            case NInd:
-                gc_track(NODE(a)->to);
-                break;
-            case NData:
-                for (int i = NODE(a)->d_arity - 1; i >= 0; --i) {
-                    gc_track(NODE(a)->params[i]);
-                }
-                break;
-            default: break;
+void gc_track_children(addr_t a) {
+    switch (NODE(a)->type) {
+    case NAPP:
+        gc_track(NODE(a)->left);
+        gc_track(NODE(a)->right);
+        break;
+    case NIND:
+        gc_track(NODE(a)->to);
+        break;
+    case NDATA:
+        for (int64_t i = NODE(a)->d_arity - 1; i >= 0; --i) {
+            gc_track(NODE(a)->d_params[i]);
         }
+        break;
+    default: break;
     }
 }
 
 void global_gc(void) {
-    stack_traverse(gc_track);
+    // stack_traverse(gc_track);
+    for (int64_t i = stack_sp - 1; i >= 0; --i) {
+        gc_track(stack_arr[i]);
+    }
     for (int64_t i = slab_size - 1; i >= 0; --i) {
-        if (slab_arr[i].slot_tag == Occupied 
-            && slab_arr[i].node.type != NGlobal) {
+        if (slab_arr[i].slot_tag == OCCUPIED 
+            && ! slab_arr[i].node.gc_isglobal) {
             if (! slab_arr[i].node.gc_reachable)
                 slab_free(i);
             else
@@ -229,41 +263,41 @@ void inst_pushg(addr_t p) {
     stack_push(p);
 }
 
-void inst_pushi(int val) {
+void inst_pushi(int64_t val) {
     addr_t a = node_alloc();
-    NODE(a)->type = NInt;
+    NODE(a)->type = NINT;
     NODE(a)->intv = val;
     stack_push(a);
 }
 
-void inst_push(int offset) {
+void inst_push(int64_t offset) {
     stack_push(STACK_OFFSET(offset));
 }
 
 void inst_mkapp(void) {
+    addr_t a = node_alloc();
     addr_t a0 = STACK_OFFSET(0);
     addr_t a1 = STACK_OFFSET(1);
-    addr_t a = node_alloc();
-    NODE(a)->type = NApp;
+    NODE(a)->type = NAPP;
     NODE(a)->left = a0; NODE(a)->right = a1;
     stack_sp -= 1;
     STACK_TOP = a;
 }
 
-void inst_update(int offset) {
+void inst_update(int64_t offset) {
     addr_t a = STACK_TOP;
     stack_sp -= 1;
-    NODE(STACK_OFFSET(offset))->type = NInd;
+    NODE(STACK_OFFSET(offset))->type = NIND;
     NODE(STACK_OFFSET(offset))->to = a;
 }
 
-void inst_pack(int tag, int arity) {
+void inst_pack(int64_t tag, int64_t arity) {
     addr_t a = node_alloc();
-    NODE(a)->type = NData;
+    NODE(a)->type = NDATA;
     NODE(a)->tag = tag; NODE(a)->d_arity = arity;
-    NODE(a)->params = arity ? malloc(arity * sizeof(addr_t)) : NULL;
-    for (int i = 0; i < arity; ++i) {
-        NODE(a)->params[i] = STACK_OFFSET(i);
+    NODE(a)->d_params = arity ? malloc(arity * sizeof(addr_t)) : NULL;
+    for (int64_t i = 0; i < arity; ++i) {
+        NODE(a)->d_params[i] = STACK_OFFSET(i);
     }
     stack_sp -= arity;
     stack_push(a);
@@ -272,12 +306,12 @@ void inst_pack(int tag, int arity) {
 void inst_split(void) {
     addr_t a = STACK_TOP;
     stack_sp -= 1;
-    for (int i = NODE(a)->d_arity - 1; i >= 0; --i) {
-        stack_push(NODE(a)->params[i]);
+    for (int64_t i = NODE(a)->d_arity - 1; i >= 0; --i) {
+        stack_push(NODE(a)->d_params[i]);
     }
 }
 
-void inst_slide(int n) {
+void inst_slide(int64_t n) {
     STACK_OFFSET(n) = STACK_TOP;
     stack_sp -= n;
 }
@@ -285,62 +319,71 @@ void inst_slide(int n) {
 void inst_unwind(void);
 
 void inst_eval(void) {
-    addr_t a = STACK_TOP;
-    STACK_TOP = (addr_t)stack_bp;
-    stack_bp = stack_sp;
-    stack_push(a);
+    // addr_t a = STACK_TOP;
+    // STACK_TOP = (addr_t)stack_bp;
+    // stack_bp = stack_sp;
+    // stack_push(a);
+    dump_push(stack_bp);
+    stack_bp = stack_sp - 1;
     inst_unwind();
 }
 
 void inst_unwind(void) {
     while (1) {
         addr_t a = STACK_TOP;
-        int arity;
+        int64_t arity;
         switch (NODE(a)->type) {
-            case NApp: stack_push(NODE(a)->left); break;
-            case NInd: STACK_TOP = NODE(a)->to; break;
-            case NGlobal:
+            case NAPP: stack_push(NODE(a)->left); break;
+            case NIND: STACK_TOP = NODE(a)->to; break;
+            case NGLOBAL:
                 arity = NODE(a)->g_arity;
                 if (stack_sp - stack_bp - 1 >= arity) {
-                    for (int i = 0; i < arity; ++i) {
+                    for (int64_t i = 0; i < arity; ++i) {
                         STACK_OFFSET(i) = NODE(STACK_OFFSET(i + 1))->right;
                     }
                     NODE(a)->code();
                 } else {
-                    stack_sp = stack_bp;
-                    stack_bp = (int64_t)STACK_TOP;
-                    STACK_TOP = stack_arr[stack_sp];
+                    // stack_sp = stack_bp;
+                    // stack_bp = (int64_t)STACK_TOP;
+                    // STACK_TOP = stack_arr[stack_sp];
+                    stack_sp = stack_bp + 1;
+                    stack_bp = DUMP_TOP;
+                    dump_sp -= 1;
                     return;
                 }
                 break;
             default:
-                stack_sp = stack_bp;
-                stack_bp = (int64_t)STACK_TOP;
-                STACK_TOP = a;
+                // stack_sp = stack_bp;
+                // stack_bp = (int64_t)STACK_TOP;
+                // STACK_TOP = a;
+                stack_arr[stack_bp] = a;
+                stack_sp = stack_bp + 1;
+                stack_bp = DUMP_TOP;
+                dump_sp -= 1;
                 return;
         }
     }
 }
 
-void inst_pop(int n) {
+void inst_pop(int64_t n) {
     stack_sp -= n;
 }
 
-void inst_alloc(int n) {
-    for (int i = 0; i < n; ++i) {
-        addr_t a = node_alloc();
-        NODE(a)->type = NInd;
-        NODE(a)->to = -1;
-        stack_push(a);
-    }
-}
+// void inst_alloc(int64_t n) {
+//     for (int64_t i = 0; i < n; ++i) {
+//         addr_t a = node_alloc();
+//         NODE(a)->type = NIND;
+//         NODE(a)->to = -1;
+//         stack_push(a);
+//     }
+// }
 
 #define INST_INT_ARITH_BINOP(op) \
     do { \
+    addr_t a = node_alloc(); \
     addr_t a0 = STACK_OFFSET(0); \
     addr_t a1 = STACK_OFFSET(1); \
-    addr_t a = node_alloc(); \
-    NODE(a)->type = NInt; \
+    NODE(a)->type = NINT; \
     NODE(a)->intv = (NODE(a0)->intv) op (NODE(a1)->intv); \
     stack_sp -= 1; \
     STACK_TOP = a; \
@@ -354,12 +397,12 @@ void inst_rem(void) { INST_INT_ARITH_BINOP(%); }
 
 #define INST_INT_CMP_BINOP(op) \
     do { \
+    addr_t a = node_alloc(); \
     addr_t a0 = STACK_OFFSET(0); \
     addr_t a1 = STACK_OFFSET(1); \
-    addr_t a = node_alloc(); \
-    NODE(a)->type = NData; \
+    NODE(a)->type = NDATA; \
     NODE(a)->tag = (NODE(a0)->intv) op (NODE(a1)->intv) ? 1 : 0; \
-    NODE(a)->params = NULL; NODE(a)->d_arity = 0; \
+    NODE(a)->d_params = NULL; NODE(a)->d_arity = 0; \
     stack_sp -= 1; \
     STACK_TOP = a; \
     } while (0)
@@ -372,11 +415,11 @@ void inst_isge(void) { INST_INT_CMP_BINOP(>=); }
 void inst_isle(void) { INST_INT_CMP_BINOP(<=); }
 
 void inst_not(void) {
-    addr_t a0 = STACK_TOP;
     addr_t a = node_alloc();
-    NODE(a)->type = NData;
+    addr_t a0 = STACK_TOP;
+    NODE(a)->type = NDATA;
     NODE(a)->tag = (! NODE(a0)->tag) ? 1 : 0;
-    NODE(a)->params = NULL; NODE(a)->d_arity = 0;
+    NODE(a)->d_params = NULL; NODE(a)->d_arity = 0;
     STACK_TOP = a;
 }
 
@@ -393,11 +436,12 @@ void print_head(const char* format) {
 int main(void) {
     slab_init();
     stack_init();
+    dump_init();
 
     global_init();
 
-    int input;
-    scanf("%d", &input);
+    int64_t input;
+    scanf("%ld", &input);
     
     inst_pushi(input);
     inst_pushg(entry_func_addr);
@@ -405,10 +449,10 @@ int main(void) {
     inst_eval();
 
     if (NODE(STACK_TOP)->tag != 0) {
-        print_head("%d");
+        print_head("%ld");
     }
     while (NODE(STACK_TOP)->tag != 0) {
-        print_head(",%d");
+        print_head(",%ld");
     }
     putchar('\n');
 

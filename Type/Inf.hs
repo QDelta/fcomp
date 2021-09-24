@@ -10,7 +10,8 @@ import Utils.State
 import Parser.AST
 import Type.Def
 
-type DTMap = Map String Int -- name, arity
+-- data type with only constant constructors can be translate to integers
+type DTMap = Map String (Int, Bool) -- number of type parameters, is number type
 type FTMap = Map String PType
 type CTMap = Map String PType
 type LTMap = Map String MType
@@ -135,8 +136,8 @@ inferProgram (dataDefs, fnDefs) = do
   traverse_ inferGroup fnGrps
 
 constructData :: DataDef -> TState ()
-constructData (DataDef name tparams _) =
-  bindD (name, length tparams)
+constructData (DataDef name tparams constrs) =
+  bindD (name, (length tparams, all (null . snd) constrs))
 
 inferData :: DataDef -> TState ()
 inferData (DataDef name tpNames constrs) = do
@@ -164,7 +165,7 @@ inferData (DataDef name tpNames constrs) = do
     tsToType (DataTS name tss) = do
       maybeArity <- getD (mLookup name)
       arity <- case maybeArity of
-        Just a -> return a
+        Just (a, _) -> return a
         Nothing -> typeError $ "undefined data type " ++ name
       name' <- if arity == length tss then return name else typeError "incomplete data type"
       types <- traverse tsToType tss
@@ -353,9 +354,9 @@ primFn = mFromList
 
 primData :: DTMap
 primData = mFromList
-  [ ("Int",  0),
-    ("Bool", 0),
-    ("List", 1)
+  [ ("Int",  (0, True)),
+    ("Bool", (0, True)),
+    ("List", (1, False))
   ]
 
 primConstr :: CTMap
