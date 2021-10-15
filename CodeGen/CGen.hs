@@ -17,7 +17,7 @@ initFn (n, a, c) = (n, NGlobal a c)
 
 codeGen :: CompiledCore -> CCode
 codeGen p =
-  concatMap genFnAddr nnl ++
+  concatMap genFnGOffset nnl ++
   concatMap genFn nnl ++
   initG
   where
@@ -27,11 +27,11 @@ codeGen p =
 mangle :: String -> String
 mangle = ("f_" ++)
 
-mangleAddr :: String -> String
-mangleAddr name = mangle name ++ "_addr"
+mangleGOffset :: String -> String
+mangleGOffset name = mangle name ++ "_offset"
 
-genFnAddr :: (String, Node) -> CCode
-genFnAddr (name, _) = "addr_t " ++ mangleAddr name ++ ";\n"
+genFnGOffset :: (String, Node) -> CCode
+genFnGOffset (name, _) = "int_t " ++ mangleGOffset name ++ ";\n"
 
 genFn :: (String, Node) -> CCode
 genFn (name, NGlobal _ code) =
@@ -41,28 +41,34 @@ genFn (name, NGlobal _ code) =
 
 genInitGlobal :: [(String, Node)] -> CCode
 genInitGlobal nnl = 
+  "static node_t global_funcs[" ++ show (length nnl) ++ "];\n" ++
   "void global_init(void) {\n" ++
-  "addr_t ga;\n" ++
-  concatMap allocInitGlobal nnl ++ "}\n"
+  "global_num = " ++ show (length nnl) ++ ";\n" ++
+  "globals = global_funcs;\n" ++
+  concatMap allocInitGlobal (zip [0..] nnl) ++ "}\n"
 
-allocInitGlobal :: (String, Node) -> CCode
-allocInitGlobal (name, NGlobal arity _) =
-  "ga = node_alloc_nogc();\n" ++
-  "NODE(ga)->type = NGLOBAL;\n" ++
-  "NODE(ga)->g_arity = " ++ show arity ++ ";\n" ++
-  "NODE(ga)->code = " ++ mangle name ++ ";\n" ++
-  "NODE(ga)->gc_isglobal = TRUE;\n" ++
-  mangleAddr name ++ " = ga;\n" ++
+allocInitGlobal :: (Int, (String, Node)) -> CCode
+allocInitGlobal (offset, (name, NGlobal arity _)) =
+  fNode ++ ".type = NGLOBAL;\n" ++
+  fNode ++ ".g_arity = " ++ show arity ++ ";\n" ++
+  fNode ++ ".code = " ++ mangle name ++ ";\n" ++
+  fNode ++ ".gc_isglobal = TRUE;\n" ++
+  fNode ++ ".gc_forwarding = " ++ fNodePtr ++ ";\n" ++
+  mangleGOffset name ++ " = " ++ offsetStr ++ ";\n" ++
   assignStartAddr
   where
-    assignStartAddr = if name == "start" then "entry_func_addr = ga;\n" else ""
+    offsetStr = show offset
+    fNode = "global_funcs[" ++ offsetStr ++ "]"
+    fNodePtr = "(global_funcs + " ++ offsetStr ++ ")"
+    assignStartAddr = 
+      if name == "start" then "entry_func_offset = " ++ offsetStr ++ ";\n" else ""
 
 genCode :: Code -> CCode
 genCode = concatMap genInstr
 
 genInstr :: Instruction -> CCode
 genInstr (PushG name) = 
-  "inst_pushg(" ++ mangleAddr name ++ ");\n"
+  "inst_pushg(" ++ mangleGOffset name ++ ");\n"
 genInstr (PushI n) =
   "inst_pushi(" ++ show n ++ ");\n"
 genInstr (Push o) =
@@ -110,9 +116,9 @@ genInstr IsLe =
 genInstr Not =
   "inst_not();\n"
 genInstr (Jump brs) =
-  "switch (NODE(STACK_TOP)->tag) {\n" ++
+  "switch (PEEK(node_ptr_t)->tag) {\n" ++
   concatMap genCase brs ++
-  "default: fprintf(stderr, \"Non-exhaustive pattern\"); exit_program();\n" ++
+  "default: puts(\"Non-exhaustive pattern\"); exit_program();\n" ++
   "};\n"
 
 genCase :: (Int, [Instruction]) -> CCode

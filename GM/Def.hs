@@ -5,10 +5,6 @@ import Utils.Map
 data Instruction
   = PushG  String
   | PushI  Int
-  | PushV  Int
-  | MkInt
-  | MkTag
-  | Load
   | Push   Int
   | Pop    Int
   | MkApp 

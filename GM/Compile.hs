@@ -84,20 +84,7 @@ compileFn (n, a, b) = (n, a, code ++ clean)
     code = compileWHNF (initialFrame a) b
     clean = [Update a, Pop a]
 
--- eval expr to a value on v-stack
-compileVal :: Frame -> CoreExpr -> Code
-compileVal _ (IntCE n) = [PushV n]
-compileVal f e@(AppCE (GVarCE op) opr) =
-  case lookup op prim1 of
-    Just inst -> compileVal f opr ++ [inst]
-    Nothing -> compileWHNF f e ++ [Eval]
-compileVal f e@(AppCE (AppCE (GVarCE op) opr1) opr2) =
-  case lookup op prim2 of
-    Just inst -> compileVal f opr2 ++ compileVal f opr1 ++ [inst]
-    Nothing -> compileWHNF f e ++ [Eval]
-compileVal f e = compileWHNF f e ++ [Load]
-
--- eval expr to WHNF on a-stack
+-- eval expr to WHNF on stack
 compileWHNF :: Frame -> CoreExpr -> Code
 compileWHNF _ (IntCE n) = [PushI n]
 compileWHNF f (CaseDCE e brs) = compileWHNF f e ++ [Jump (compileBranches f brs)]
@@ -105,12 +92,10 @@ compileWHNF f e@(AppCE (GVarCE op) opr) =
   case lookup op prim1 of
     Just inst -> compileWHNF f opr ++ [inst]
     Nothing -> compileLazy f e ++ [Eval]
-  -- compileWHNF f e ++ [assertJust $ mLookup op strictUnaryFns]
 compileWHNF f e@(AppCE (AppCE (GVarCE op) opr1) opr2) =
   case lookup op prim2 of
     Just inst -> compileWHNF f opr2 ++ compileWHNF (pushStack f 1) opr1 ++ [inst]
     Nothing -> compileLazy f e ++ [Eval]
-  -- compileWHNF f e2 ++ compileWHNF (pushStack f 1) e1 ++ [assertJust $ mLookup op strictBinFns]
 compileWHNF f e = compileLazy f e ++ [Eval]
 
 -- TODO: lazy case: generate a function (lambda lifting)
