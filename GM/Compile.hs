@@ -87,7 +87,7 @@ compileFn (n, a, b) = (n, a, code ++ clean)
 -- eval expr to WHNF on stack
 compileWHNF :: Frame -> CoreExpr -> Code
 compileWHNF _ (IntCE n) = [PushI n]
-compileWHNF f (CaseDCE e brs) = compileWHNF f e ++ [Jump (compileBranches f brs)]
+compileWHNF f (CaseCE e brs) = compileWHNF f e ++ [Jump (compileBranches f brs)]
 compileWHNF f e@(AppCE (GVarCE op) opr) =
   case lookup op prim1 of
     Just inst -> compileWHNF f opr ++ [inst]
@@ -105,7 +105,7 @@ compileLazy f (LVarCE i) = [Push (getOffset f i)]
 compileLazy _ (IntCE n) = [PushI n]
 compileLazy f (AppCE e1 e2) = 
   compileLazy f e2 ++ compileLazy (pushStack f 1) e1 ++ [MkApp]
-compileLazy f (CaseDCE e brs) = 
+compileLazy f (CaseCE e brs) = 
   error "case expression in lazy environment are not implemented yet, use a function to wrap it."
 
 compileBranches :: Frame -> [CoreBranch] -> [(Int, Code)]

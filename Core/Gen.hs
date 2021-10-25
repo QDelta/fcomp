@@ -42,7 +42,7 @@ genCoreExpr _ lm (VarE name) =
 genCoreExpr cCons lm (AppE e1 e2) = AppCE (gen e1) (gen e2)
   where gen = genCoreExpr cCons lm
 genCoreExpr cCons lm (CaseE e brs) =
-  CaseDCE ce coreBrs
+  CaseCE ce coreBrs
   where
     ce = genCoreExpr cCons lm e
     coreBrs = map (genCoreBranch cCons lm) brs
