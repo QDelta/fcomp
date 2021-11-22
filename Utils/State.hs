@@ -17,7 +17,7 @@ evalState :: State s a -> s -> a
 evalState s = fst . runState s
 
 instance Monad (State s) where
-  return x = State (x,)
+  return = pure
   (State r1) >>= f = State $
     \s1 -> let
       (x, s2) = r1 s1
@@ -28,7 +28,7 @@ instance Functor (State s) where
   fmap f (State r) = State (first f . r)
 
 instance Applicative (State s) where
-  pure = return
+  pure x = State (x,)
   sab <*> sa = do
     fab <- sab
     fab <$> sa

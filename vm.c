@@ -430,11 +430,10 @@ void print_stat() {
 }
 
 int main(void) {
-    alloc_init();
     global_init();
 
     int_t input;
-    scanf("%ld", &input);
+    scanf("%lld", &input);
 
     inst_pushi(input);
     inst_pushg(entry_func_offset);

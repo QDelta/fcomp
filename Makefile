@@ -1,3 +1,5 @@
+-include Makefile.config
+
 ODIR=build
 
 all: fcomp

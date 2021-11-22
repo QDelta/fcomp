@@ -18,7 +18,7 @@ import Control.Applicative (Alternative(..))
 newtype Parser i o = Parser { runParser :: [i] -> Maybe (o, [i]) }
 
 instance Monad (Parser i) where
-  return a = Parser $ \is -> Just (a, is)
+  return = pure
   (Parser pa) >>= f = Parser $ \is ->
     case pa is of
       Just (a, rest) -> runParser (f a) rest
@@ -28,7 +28,7 @@ instance Functor (Parser i) where
   fmap f (Parser p) = Parser (fmap (first f) . p)
 
 instance Applicative (Parser i) where
-  pure = return
+  pure a = Parser $ \is -> Just (a, is)
   pab <*> pa = do
     fab <- pab
     fab <$> pa
