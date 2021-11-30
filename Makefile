@@ -10,4 +10,7 @@ fcomp: $(ODIR)
 $(ODIR):
 	mkdir $(ODIR)
 
-.PHONY: fcomp
+clean:
+	rm -r $(ODIR)
+
+.PHONY: fcomp clean

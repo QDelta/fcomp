@@ -38,6 +38,7 @@ genFn (name, NGlobal _ code) =
   "void " ++ mangle name ++ "(void) {\n" ++
   genCode code ++
   "}\n"
+genFn (_, _) = error "genFn"
 
 genInitGlobal :: [(String, Node)] -> CCode
 genInitGlobal nnl = 
@@ -62,6 +63,7 @@ allocInitGlobal (offset, (name, NGlobal arity _)) =
     fNodePtr = "(global_funcs + " ++ offsetStr ++ ")"
     assignStartAddr = 
       if name == "start" then "entry_func_offset = " ++ offsetStr ++ ";\n" else ""
+allocInitGlobal (_, _) = error "allocInitGlobal"
 
 genCode :: Code -> CCode
 genCode = concatMap genInstr

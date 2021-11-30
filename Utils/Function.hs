@@ -8,6 +8,7 @@ second f (x, y) = (x, f y)
 
 assertJust :: Maybe t -> t
 assertJust (Just a) = a
+assertJust Nothing = error "assertJust: Nothing"
 
 mapAccumL :: (a -> b -> (c, a)) -> a -> [b] -> ([c], a)
 mapAccumL f acc [] = ([], acc)

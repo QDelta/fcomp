@@ -88,6 +88,7 @@ splitPrefix s [] = Just s
 splitPrefix (c : s) (p : ps)
   | c == p    = splitPrefix s ps
   | otherwise = Nothing
+splitPrefix [] (_ : _) = Nothing
 
 symbols :: [(String, Token)]
 symbols =

@@ -252,6 +252,7 @@ paramBind :: [String] -> MType -> ([(String, MType)], MType)
 paramBind [] t = ([], t)
 paramBind (n : ns) (ArrT t1 t2) = ((n, t1) : restBind, ret)
   where (restBind, ret) = paramBind ns t2
+paramBind _ _ = error ""
 
 deepResolve :: MType -> TState MType
 deepResolve (VarT p) = do
