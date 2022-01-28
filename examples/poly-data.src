@@ -36,4 +36,4 @@ take n l =
 
 nats = Cons 0 (map (add 1) nats);
 
-start n = take n (map addP (zip nats nats));
+start n = take n (map addP (zip nats nats))

@@ -11,4 +11,4 @@ head l = case l of
 from n = Cons n (from (add 1 n));
 
 -- [3]
-start n = Cons (head (map (add 2) (from 1))) Nil;
+start n = Cons (head (map (add 2) (from 1))) Nil

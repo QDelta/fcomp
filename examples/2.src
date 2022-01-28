@@ -11,4 +11,4 @@ concat l1 l2 = case l1 of
 foo = len (concat (Cons 0 (Cons 1 Nil)) (Cons (add 2 1) Nil));
 
 -- [n, 6]
-start n = Cons n (Cons (add foo foo) Nil);
+start n = Cons n (Cons (add foo foo) Nil)

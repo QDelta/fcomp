@@ -19,4 +19,4 @@ isEven n = eq 0 (rem n 2);
 
 b2i b = ifte b 1 0;
 
-start n = take n (map b2i (map isEven nats));
+start n = take n (map b2i (map isEven nats))

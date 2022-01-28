@@ -144,7 +144,7 @@ type Definition = Either DataDef FnDef
 type PreProgram = [Definition]
 
 pProgram :: TParser PreProgram 
-pProgram = pplus pDef
+pProgram = pinterleave pDef pSemiC
 
 pDef :: TParser Definition 
 pDef = 
@@ -158,7 +158,6 @@ pData = do
   params <- pstar pLName
   psym Equal
   cs <- pinterleave pConstructor (psym Or)
-  pSemiC
   return (DataDef n params cs)
 
 pConstructor :: TParser Constructor
@@ -188,9 +187,7 @@ pFn = do
   name <- pLName
   params <- pstar pLName
   psym Equal
-  body <- pExpr
-  psym SemiC
-  return (FnDef name params body)
+  FnDef name params <$> pExpr
 
 pExpr :: TParser Expr
 pExpr = 

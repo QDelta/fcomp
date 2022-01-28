@@ -17,4 +17,4 @@ nats = Cons 0 (map (add 1) nats);
 
 isEven n = ifte (eq 0 (rem n 2)) 1 0;
 
-start n = take n (map isEven nats);
+start n = take n (map isEven nats)

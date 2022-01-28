@@ -3,4 +3,4 @@ diverge = not diverge;
 b2i b = case b of { False -> 0; True -> 1 };
 
 -- [0, 1]
-start n = Cons (b2i (and False diverge)) (Cons (b2i (or True diverge)) Nil);
+start n = Cons (b2i (and False diverge)) (Cons (b2i (or True diverge)) Nil)

@@ -2,4 +2,4 @@ s x y z = x z (y z);
 k x y = x;
 i = s k k;
 
-start n = Cons (i n) Nil;
+start n = Cons (i n) Nil

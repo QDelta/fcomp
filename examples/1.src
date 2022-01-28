@@ -6,4 +6,4 @@ head l = case l of
 from n = Cons n (from (add 1 n));
 
 -- [1]
-start n = Cons (head (from 1)) Nil;
+start n = Cons (head (from 1)) Nil

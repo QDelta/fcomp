@@ -23,4 +23,4 @@ tail l = case l of
 
 fibs = Cons 1 (Cons 1 (zipWith add fibs (tail fibs)));
 
-start n = take n fibs;
+start n = take n fibs
