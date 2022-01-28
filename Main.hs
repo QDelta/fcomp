@@ -1,7 +1,7 @@
 module Main where
 
 import System.Environment (getArgs)
-import Parser.Parser
+import Parser.Parse
 import Type.Inf
 import Core.Gen
 import GM.Compile
