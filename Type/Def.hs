@@ -10,18 +10,18 @@ data MType
 
 data PType = Forall (Set Int) MType
 
-instance (Show MType) where
+instance Show MType where
   show t = case t of
-    VarT n -> show n
+    VarT n -> 't' : show n
     DataT n ts -> n ++ concatMap (\t -> ' ' : showP t) ts
     ArrT l r -> showP l ++ " -> " ++ show r
     where
       showP t@(ArrT _ _) = '(' : show t ++ ")"
       showP t = show t
 
-instance (Show PType) where
+instance Show PType where
   show (Forall ps t) =
     (if sIsEmpty ps then "" else tparamStr) ++ show t
     where 
-      showp p = ' ' : show p
-      tparamStr = "forall" ++ concatMap showp ps ++ ". "
+      tparamStr =
+        "forall" ++ concatMap (\p -> " t" ++ show p) ps ++ ". "

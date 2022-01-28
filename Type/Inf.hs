@@ -1,11 +1,11 @@
 module Type.Inf (infer) where
 
-import Data.Graph (SCC, stronglyConnComp, flattenSCC)
 import Data.Foldable (traverse_)
 
 import Utils.Function
 import Utils.Map
 import Utils.Set
+import Utils.Graph
 import Utils.State
 import Parser.AST
 import Type.Def
@@ -89,10 +89,9 @@ newTypeVars :: Int -> TState [MType]
 newTypeVars n = traverse (const newTypeVar) (replicate n ())
 
 depGroupSort :: Set String -> [FnDef] -> [[FnDef]]
-depGroupSort constrNames defs = map flattenSCC sccs
+depGroupSort constrNames defs = strongCCs depGraph
   where
     depGraph = genDepGraph constrNames defs
-    sccs = stronglyConnComp depGraph
 
 -- (f1, f2) in E : f1 (indirectly) calls f2
 genDepGraph :: Set String -> [FnDef] -> [(FnDef, String, [String])]

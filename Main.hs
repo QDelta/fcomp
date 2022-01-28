@@ -18,12 +18,12 @@ main :: IO ()
 main = do
   srcFile : restArgs <- getArgs
   let dstFile = case restArgs of { [] -> defaultDstFile; h : _ -> h }
-  progText <- readFile srcFile
 
+  progText <- readFile srcFile
   rtCode <- readFile runtime
 
   let prog = parse progText
-  let core = (optimize . compile . genCore) prog
+  let progCode = (codeGen . optimize . compile . genCore) prog
   putStrLn $ infer prog
 
-  writeFile dstFile (rtCode ++ codeGen core)
+  writeFile dstFile (rtCode ++ progCode)

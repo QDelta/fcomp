@@ -12,7 +12,7 @@ import GM.Def
 
 type Frame = ([Int], Int)
 -- bindings on stack: (top) $5, $6, $2, $3, $4, $0, $1 (bottom)
--- => fst Frame = [5, 2]
+-- => fst Frame = [5, 2], represents $5, .., $2, .., $0, ..
 --    snd Frame = length [$5, $6] = 2
 
 getTop :: [Int] -> Int
@@ -74,9 +74,9 @@ compilePrimFn arity (name, inst) =
 
 compiledPrimFns :: [CompiledCoreFn]
 compiledPrimFns = 
-  map (compilePrimFn 2) (primInt2 ++ primBool2) ++ map (compilePrimFn 1) primBool1
+  map (compilePrimFn 2) prim2 ++ map (compilePrimFn 1) prim1
 
-type CompiledCoreFn = (String, Int, Code)
+type CompiledCoreFn = (String, Int, Code) -- name, arity, code
 
 compileFn :: CoreFn -> CompiledCoreFn
 compileFn (n, a, b) = (n, a, code ++ clean)
@@ -124,7 +124,7 @@ compileConstr (name, arity, tag) =
   (name, arity, tag, pushP ++ [Pack tag arity, Update arity, Pop arity])
   where pushP = replicate arity (Push (arity - 1))
 
-compiledPrimFn :: [CompiledCoreFn] -- name, arity, code
+compiledPrimFn :: [CompiledCoreFn]
 compiledPrimFn = compiledPrimFns ++
   [ ("and", 2, [Push 0, Eval, Jump [(0, [Pop 1, Pack 0 0]), (1, [Pop 1, Push 1, Eval])], Update 2, Pop 2]),
     ("or",  2, [Push 0, Eval, Jump [(0, [Pop 1, Push 1, Eval]), (1, [Pop 1, Pack 1 0])], Update 2, Pop 2])
