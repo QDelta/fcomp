@@ -1,7 +1,5 @@
 module Type.Inf (infer) where
 
-import Data.Foldable (traverse_)
-
 import Utils.Function
 import Utils.Map
 import Utils.Set

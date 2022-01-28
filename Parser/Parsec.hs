@@ -13,7 +13,6 @@ module Parser.Parsec
   ) where
 
 import Utils.Function
-import Control.Applicative (Alternative(..))
 
 newtype Parser i o = Parser { runParser :: [i] -> Maybe (o, [i]) }
 
@@ -33,12 +32,16 @@ instance Applicative (Parser i) where
     fab <- pab
     fab <$> pa
 
-instance Alternative (Parser i) where
-  empty = Parser (const Nothing)
-  (Parser p1) <|> (Parser p2) = Parser $ \is ->
-    case p1 is of
-      r@(Just (_, _)) -> r
-      Nothing -> p2 is
+pempty :: Parser i o
+pempty = Parser (const Nothing)
+
+infixr 1 <|>
+
+(<|>) :: Parser i o -> Parser i o -> Parser i o
+Parser p1 <|> Parser p2 = Parser $ \is ->
+  case p1 is of
+    r@(Just _) -> r
+    Nothing -> p2 is
 
 pitem :: Parser i i
 pitem = Parser $ \case
@@ -54,7 +57,7 @@ pseq pa pb = do
 psat :: (i -> Bool) -> Parser i i
 psat f = do
   x <- pitem
-  if f x then return x else empty
+  if f x then return x else pempty
 
 psym :: Eq i => i -> Parser i i
 psym x = psat (== x)

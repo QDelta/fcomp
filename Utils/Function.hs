@@ -8,7 +8,7 @@ second f (x, y) = (x, f y)
 
 assertJust :: Maybe t -> t
 assertJust (Just a) = a
-assertJust Nothing = error "assertJust: Nothing"
+assertJust Nothing = error "expect Just"
 
 mapAccumL :: (a -> b -> (c, a)) -> a -> [b] -> ([c], a)
 mapAccumL f acc [] = ([], acc)
@@ -51,3 +51,6 @@ classify f (x : xs)
   | f x       = first  (x :) rest
   | otherwise = second (x :) rest
   where rest = classify f xs
+
+traverse_ :: (Traversable t, Applicative f) => (a -> f b) -> t a -> f ()
+traverse_ f l = () <$ traverse f l
