@@ -2,8 +2,8 @@
 
 module Parser.Parser where
 
+import Utils.Parsec
 import Parser.AST
-import Parser.Parsec
 
 data Token
   = LParen | RParen

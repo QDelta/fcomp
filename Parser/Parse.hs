@@ -1,8 +1,8 @@
 module Parser.Parse (parse) where
 
+import Utils.Parsec
 import Parser.AST
 import Parser.Lexer
-import Parser.Parsec
 import Parser.Parser
 import Utils.Function
 
