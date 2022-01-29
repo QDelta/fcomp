@@ -16,7 +16,7 @@ typedef void (*func_t)(void);
 #ifndef MEM_SIZE
 #define MEM_SIZE (1ULL << 24)
 #endif
-static byte_t memory[MEM_SIZE]; 
+static byte_t memory[MEM_SIZE];
 
 static ptr_t bp = memory + MEM_SIZE;
 static ptr_t sp = memory + MEM_SIZE;
@@ -86,7 +86,7 @@ void global_gc(void);
 
 // should call with proper value before each instruction
 void mem_reserve(int_t r_size) {
-    if ((ptr_t)brk - (ptr_t)memory >= gc_threshold || 
+    if ((ptr_t)brk - (ptr_t)memory >= gc_threshold ||
         (ptr_t)sp - (ptr_t)brk < r_size) {
         global_gc();
         if ((ptr_t)sp - (ptr_t)brk < r_size) {
@@ -224,7 +224,7 @@ void global_gc(void) {
         }
         p = OFFSET(p, p->gc_blksize);
     }
-    
+
     // 4: move objects
 
     node_ptr_t new_p;
@@ -241,7 +241,7 @@ void global_gc(void) {
 
     // 5: update brk
     brk = OFFSET(new_p, new_p->gc_blksize);
-    
+
     stat_gc_count += 1;
 }
 
@@ -272,7 +272,7 @@ void inst_mkapp(void) {
     node_ptr_t p0 = PEEK_OFFSET(node_ptr_t, 0);
     node_ptr_t p1 = PEEK_OFFSET(node_ptr_t, 1);
     p->type = NAPP;
-    p->left = p0; 
+    p->left = p0;
     p->right = p1;
     POP_N(node_ptr_t, 2);
     PUSH(node_ptr_t, p);
@@ -447,7 +447,7 @@ int main(void) {
         print_head(",%ld");
     }
     putchar('\n');
-    
+
     print_stat();
 
     exit_program();

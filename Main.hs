@@ -8,7 +8,7 @@ import GM.Compile
 import GM.Optimize
 import CodeGen.CGen
 
-runtime :: FilePath 
+runtime :: FilePath
 runtime = "vm.c"
 
 defaultDstFile :: FilePath

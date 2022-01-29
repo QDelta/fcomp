@@ -6,12 +6,12 @@ import Parser.AST
 import Type.Inf
 import Core.Def
 
-initialCore :: CoreProgram 
-initialCore = 
+initialCore :: CoreProgram
+initialCore =
   ([("False", 0, 0), ("True", 0, 1), ("Nil", 0, 0), ("Cons", 2, 1)], [])
 
 genCore :: Program -> CoreProgram
-genCore (dataDefs, fnDefs) = 
+genCore (dataDefs, fnDefs) =
   foldl addCoreFn (foldl addCoreData initialCore dataDefs) fnDefs
 
 addCoreData :: CoreProgram -> DataDef -> CoreProgram
@@ -47,7 +47,7 @@ genCoreExpr cCons lm (CaseE e brs) =
     ce = genCoreExpr cCons lm e
     coreBrs = map (genCoreBranch cCons lm) brs
 
-genCoreBranch :: [CoreConstr] -> LOffSetMap -> Branch -> CoreBranch 
+genCoreBranch :: [CoreConstr] -> LOffSetMap -> Branch -> CoreBranch
 genCoreBranch cCons lm (name, binds, e) = (arity, tag, ce)
   where
     atMap = mFromList $ map (\(n, a, t) -> (n, (a, t))) cCons
