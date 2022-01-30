@@ -1,4 +1,4 @@
-module Utils.Set 
+module Utils.Set
   ( Set,
     emptySet,
     sElem,

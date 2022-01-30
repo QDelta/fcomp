@@ -1,4 +1,4 @@
-module Utils.Map 
+module Utils.Map
   ( Map,
     emptyMap,
     mElem,

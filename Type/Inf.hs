@@ -25,7 +25,7 @@ data TypeEnv = TypeEnv
   }
 
 instance Show TypeEnv where
-  show env = 
+  show env =
     "Data types:\n" ++ show (dtmap env) ++ "\n\n" ++
     "Functions:\n" ++ show (ftmap env) ++ "\n\n" ++
     "Constructors:\n" ++ show (ctmap env) ++ "\n"
@@ -61,15 +61,15 @@ getL f = getEnv (f . ltmap)
 getV f = getEnv (f . vtmap)
 
 -- set : (Map -> Map) -> TState ()
-setD f = State $ 
+setD f = State $
   \env -> ((), env { dtmap = f (dtmap env) })
-setF f = State $ 
+setF f = State $
   \env -> ((), env { ftmap = f (ftmap env) })
-setC f = State $ 
+setC f = State $
   \env -> ((), env { ctmap = f (ctmap env) })
-setL f = State $ 
+setL f = State $
   \env -> ((), env { ltmap = f (ltmap env) })
-setV f = State $ 
+setV f = State $
   \env -> ((), env { vtmap = f (vtmap env) })
 
 bindD p = setD (mInsert p)
@@ -109,11 +109,11 @@ directDepsExpr locals expr = case expr of
   where deps = directDepsExpr locals
 
 directDepsBranches :: Set String -> [Branch] -> Set String
-directDepsBranches locals brs = 
+directDepsBranches locals brs =
   foldl sUnion emptySet (map dDepBr brs)
   where
     dDepBr :: Branch -> Set String
-    dDepBr (constr, params, expr) = 
+    dDepBr (constr, params, expr) =
       directDepsExpr (sUnion locals (sFromList params)) expr
 
 exConstrs :: [DataDef] -> Set String
@@ -151,7 +151,7 @@ inferData (DataDef name tpNames constrs) = do
       bindC (name, cType)
 
     tsToType :: TypeSig -> TState MType
-    tsToType (VarTS name) = 
+    tsToType (VarTS name) =
       case mLookup name tpMap of
         Just p -> return $ VarT p
         Nothing -> typeError $ "undefined type parameter " ++ name
@@ -304,19 +304,21 @@ unify l r = do
         traverse_ (uncurry unify) (zip ts1 ts2)
       else
         unifyError n1 n2
-    (lt, rt) -> unifyError (show lt) (show rt)
+    (lt, rt) -> unifyError lt rt
 
 unifyP :: Int -> MType -> TState ()
 unifyP p t = case t of
   VarT p1 | p == p1 -> return ()
-  t | recCheck p t -> unifyError (show p) (show t)
+  t | recCheck p t -> unifyError p t
     | otherwise -> bindV (p, t)
   where
     recCheck p (VarT p1) = p == p1
     recCheck p (ArrT l r) = recCheck p l || recCheck p r
     recCheck p (DataT _ ts) = foldl (\b t -> b || recCheck p t) False ts
 
-unifyError s1 s2 = typeError $ "can not unify " ++ s1 ++ " with " ++ s2
+unifyError :: (Show a, Show b) => a -> b -> TState x
+unifyError t1 t2 =
+  typeError $ "can not unify " ++ show t1 ++ " with " ++ show t2
 
 generalize :: MType -> TState PType
 generalize t = do

@@ -22,6 +22,6 @@ instance Show MType where
 instance Show PType where
   show (Forall ps t) =
     (if sIsEmpty ps then "" else tparamStr) ++ show t
-    where 
+    where
       tparamStr =
         "forall" ++ concatMap (\p -> " t" ++ show p) ps ++ ". "

@@ -7,7 +7,7 @@ data Instruction
   | PushI  Int
   | Push   Int
   | Pop    Int
-  | MkApp 
+  | MkApp
   | Update Int
   | Pack   Int Int
   | Split

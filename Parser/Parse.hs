@@ -10,7 +10,7 @@ parse :: String -> Program
 parse s = case runParser pProgram (tlex s) of
   Just (p, []) -> reorder p
   _ -> error "ParseError"
-  where 
+  where
     reorder [] = ([], [])
     reorder (Left  dDef : rest) = first  (dDef :) $ reorder rest
     reorder (Right fDef : rest) = second (fDef :) $ reorder rest

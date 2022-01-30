@@ -1,6 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 
-module Utils.Parsec 
+module Utils.Parsec
   ( Parser(..),
     (<|>),
     pitem,

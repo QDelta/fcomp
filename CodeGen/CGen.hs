@@ -41,7 +41,7 @@ genFn (name, NGlobal _ code) =
 genFn (_, _) = error "genFn"
 
 genInitGlobal :: [(String, Node)] -> CCode
-genInitGlobal nnl = 
+genInitGlobal nnl =
   "static node_t global_funcs[" ++ show (length nnl) ++ "];\n" ++
   "void global_init(void) {\n" ++
   "global_num = " ++ show (length nnl) ++ ";\n" ++
@@ -61,7 +61,7 @@ allocInitGlobal (offset, (name, NGlobal arity _)) =
     offsetStr = show offset
     fNode = "global_funcs[" ++ offsetStr ++ "]"
     fNodePtr = "(global_funcs + " ++ offsetStr ++ ")"
-    assignStartAddr = 
+    assignStartAddr =
       if name == "start" then "entry_func_offset = " ++ offsetStr ++ ";\n" else ""
 allocInitGlobal (_, _) = error "allocInitGlobal"
 
@@ -69,7 +69,7 @@ genCode :: Code -> CCode
 genCode = concatMap genInstr
 
 genInstr :: Instruction -> CCode
-genInstr (PushG name) = 
+genInstr (PushG name) =
   "inst_pushg(" ++ mangleGOffset name ++ ");\n"
 genInstr (PushI n) =
   "inst_pushi(" ++ show n ++ ");\n"
