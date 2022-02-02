@@ -7,8 +7,15 @@ module GM.Compile
 
 import Utils.Function
 import Utils.Map
+import Common.Def
 import Core.Def
 import GM.Def
+import Prim.Name
+import Prim.GM
+
+type CompiledCoreFn = (Name, Int, Code)          -- name, arity, code
+type CompiledCoreConstr = (Name, Int, Int, Code) -- name, arity, tag, code
+type CompiledCore = ([CompiledCoreConstr], [CompiledCoreFn])
 
 type Frame = ([Int], Int)
 -- bindings on stack: (top) $5, $6, $2, $3, $4, $0, $1 (bottom)
@@ -38,46 +45,6 @@ getOffset f@(ms, count) n =
     min = getTop ms
     nextOffset = getOffset (popStack f) n
 
-primInt2 :: [(String, Instruction)]
-primInt2 =
-  [ ("add", Add),
-    ("sub", Sub),
-    ("mul", Mul),
-    ("div", Div),
-    ("rem", Rem)
-  ]
-
-primBool2 :: [(String, Instruction)]
-primBool2 =
-  [ ("eq", IsEq),
-    ("lt", IsLt),
-    ("gt", IsGt),
-    ("ne", IsNe),
-    ("le", IsLe),
-    ("ge", IsGe)
-  ]
-
-primBool1 :: [(String, Instruction)]
-primBool1 =
-  [ ("not", Not)
-  ]
-
-prim2 :: [(String, Instruction)]
-prim2 = primInt2 ++ primBool2
-
-prim1 :: [(String, Instruction)]
-prim1 = primBool1
-
-compilePrimFn :: Int -> (String, Instruction) -> CompiledCoreFn
-compilePrimFn arity (name, inst) =
-  (name, arity, concat (replicate arity [Push (arity - 1), Eval]) ++ [inst, Update arity, Pop arity])
-
-compiledPrimFns :: [CompiledCoreFn]
-compiledPrimFns =
-  map (compilePrimFn 2) prim2 ++ map (compilePrimFn 1) prim1
-
-type CompiledCoreFn = (String, Int, Code) -- name, arity, code
-
 compileFn :: CoreFn -> CompiledCoreFn
 compileFn (n, a, b) = (n, a, code ++ clean)
   where
@@ -89,15 +56,26 @@ compileWHNF :: Frame -> CoreExpr -> Code
 compileWHNF _ (IntCE n) = [PushI n]
 compileWHNF f (CaseCE e brs) = compileWHNF f e ++ [Jump (compileBranches f brs)]
 compileWHNF f e@(AppCE (GVarCE op) opr) =
-  case lookup op prim1 of
+  case mLookup (getIdent op) prim1 of
     Just inst -> compileWHNF f opr ++ [inst]
     Nothing -> compileLazy f e ++ [Eval]
 compileWHNF f e@(AppCE (AppCE (GVarCE op) opr1) opr2) =
-  case lookup op prim2 of
+  case mLookup (getIdent op) prim2 of
     Just inst -> compileWHNF f opr2 ++ compileWHNF (pushStack f 1) opr1 ++ [inst]
     Nothing -> compileLazy f e ++ [Eval]
+compileWHNF f (LetCE bindE e) =
+  compileLazy f bindE ++ compileWHNF (pushStack f 1) e ++ [Slide 1]
+compileWHNF f (LetRecCE bindEs e) =
+  Alloc n :
+       concatMap compLetR (zip bindEs [1..])
+    ++ compileWHNF newF e ++ [Slide n]
+  where
+    n = length bindEs
+    newF = pushStack f n
+    compLetR (bindE, offset) = compileLazy newF bindE ++ [Update (n - offset)]
 compileWHNF f e = compileLazy f e ++ [Eval]
 
+-- create a thunk on stack
 -- TODO: lazy case: generate a function (lambda lifting)
 compileLazy :: Frame -> CoreExpr -> Code
 compileLazy _ (GVarCE name) = [PushG name]
@@ -107,6 +85,16 @@ compileLazy f (AppCE e1 e2) =
   compileLazy f e2 ++ compileLazy (pushStack f 1) e1 ++ [MkApp]
 compileLazy f (CaseCE e brs) =
   error "case expression in lazy environment are not implemented yet, use a function to wrap it."
+compileLazy f (LetCE bindE e) =
+  compileLazy f bindE ++ compileLazy (pushStack f 1) e ++ [Slide 1]
+compileLazy f (LetRecCE bindEs e) =
+  Alloc n :
+       concatMap compLetR (zip bindEs [1..])
+    ++ compileLazy newF e ++ [Slide n]
+  where
+    n = length bindEs
+    newF = pushStack f n
+    compLetR (bindE, offset) = compileLazy newF bindE ++ [Update (n - offset)]
 
 compileBranches :: Frame -> [CoreBranch] -> [(Int, Code)]
 compileBranches f = map (compileBranch f)
@@ -117,22 +105,27 @@ compileBranch f (a, t, b) = (t, code)
     code = Split : compileWHNF newF b ++ [Slide a]
     newF = pushStack f a
 
-type CompiledCoreConstr = (String, Int, Int, Code)
-
 compileConstr :: CoreConstr -> CompiledCoreConstr
 compileConstr (name, arity, tag) =
   (name, arity, tag, pushP ++ [Pack tag arity, Update arity, Pop arity])
   where pushP = replicate arity (Push (arity - 1))
 
-compiledPrimFn :: [CompiledCoreFn]
-compiledPrimFn = compiledPrimFns ++
-  [ ("and", 2, [Push 0, Eval, Jump [(0, [Pop 1, Pack 0 0]), (1, [Pop 1, Push 1, Eval])], Update 2, Pop 2]),
-    ("or",  2, [Push 0, Eval, Jump [(0, [Pop 1, Push 1, Eval]), (1, [Pop 1, Pack 1 0])], Update 2, Pop 2])
-  ]
--- and x y = case x of { False -> False; True -> y };
--- or x y = case x of { True -> True; False -> y };
-
-type CompiledCore = ([CompiledCoreConstr], [CompiledCoreFn])
-
 compile :: CoreProgram -> CompiledCore
-compile (cs, fs) = (map compileConstr cs, compiledPrimFn ++ map compileFn fs)
+compile (cs, fs) =
+  (map compileConstr cs, compiledPrimFns ++ map compileFn fs)
+
+prim1 :: Map Ident Instruction
+prim1 =
+  foldl
+  (\m (s, inst) ->
+    mInsert (getIdent (primNames ! s), inst) m)
+  emptyMap
+  prim1Insts
+
+prim2 :: Map Ident Instruction
+prim2 =
+  foldl
+  (\m (s, inst) ->
+    mInsert (getIdent (primNames ! s), inst) m)
+  emptyMap
+  prim2Insts

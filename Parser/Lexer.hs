@@ -13,7 +13,7 @@ tlex s = case s of
     | otherwise -> callLex symLex
   where
     callLex f = toks
-      where 
+      where
         (tok, rest) = f s
         toks =
           if tok == LineComment then
@@ -50,13 +50,15 @@ intLex s = (ti, rest)
 
 nameLex :: (String -> Token) -> String -> (Token, String)
 nameLex f s = (tn, rest)
-  where 
+  where
     isNameC c = isAlpha c || isDigit c
     (name, rest) = span isNameC s
     tn = case name of
       "data" -> DataKW
       "case" -> CaseKW
       "of"   -> OfKW
+      "let"  -> LetKW
+      "in"   -> InKW
       _      -> f name
 
 symLex :: String -> (Token, String)

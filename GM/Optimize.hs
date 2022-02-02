@@ -1,11 +1,11 @@
-module GM.Optimize (optimize) where
+module GM.Optimize (optGM) where
 
 import GM.Def
 import GM.Compile
 import Utils.Function
 
-optimize :: CompiledCore -> CompiledCore
-optimize (constrs, fns) = (map optConstr constrs, map optFn fns)
+optGM :: CompiledCore -> CompiledCore
+optGM (constrs, fns) = (map optConstr constrs, map optFn fns)
 
 optConstr :: CompiledCoreConstr -> CompiledCoreConstr
 optConstr (name, arity, tag, code) = (name, arity, tag, peephole code)

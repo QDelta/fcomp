@@ -1,12 +1,13 @@
 module Parser.Parse (parse) where
 
 import Utils.Parsec
-import Parser.AST
+import Common.Def
+import Common.AST
 import Parser.Lexer
 import Parser.Parser
 import Utils.Function
 
-parse :: String -> Program
+parse :: String -> Program RdrName
 parse s = case runParser pProgram (tlex s) of
   Just (p, []) -> reorder p
   _ -> error "ParseError"

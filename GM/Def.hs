@@ -1,9 +1,10 @@
 module GM.Def where
 
 import Utils.Map
+import Common.Def
 
 data Instruction
-  = PushG  String
+  = PushG  Name
   | PushI  Int
   | Push   Int
   | Pop    Int
@@ -13,9 +14,8 @@ data Instruction
   | Split
   | Jump   [(Int, [Instruction])]
   | Slide  Int
-  | Eval
   | Alloc  Int
-  | Unwind
+  | Eval
   | Add  | Sub  | Mul  | Div  | Rem
   | IsEq | IsGt | IsLt | IsNe | IsGe | IsLe
   | Not

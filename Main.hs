@@ -2,6 +2,7 @@ module Main where
 
 import System.Environment (getArgs)
 import Parser.Parse
+import Parser.Renamer
 import Type.Inf
 import Core.Gen
 import GM.Compile
@@ -22,8 +23,8 @@ main = do
   progText <- readFile srcFile
   rtCode <- readFile runtime
 
-  let prog = parse progText
-  let progCode = (codeGen . optimize . compile . genCore) prog
+  let prog = (rename . parse) progText
+  let progCode = (codeGen . optGM . compile . genCore) prog
   putStrLn $ infer prog
 
   writeFile dstFile (rtCode ++ progCode)

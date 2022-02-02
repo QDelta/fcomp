@@ -38,12 +38,13 @@ isortWith f = isortBy (\x y -> compare (f x) (f y))
 isort :: Ord k => [k] -> [k]
 isort = isortBy compare
 
-checkUnique :: (Ord k) => [k] -> Bool
+checkUnique :: (Ord k) => [k] -> Maybe k
 checkUnique = checkUSorted . isort
   where
-    checkUSorted [] = True
-    checkUSorted [x] = True
-    checkUSorted (x : y : l) = x /= y && checkUSorted (y : l)
+    checkUSorted [] = Nothing
+    checkUSorted [x] = Nothing
+    checkUSorted (x : y : l) =
+      if x == y then Just x else checkUSorted (y : l)
 
 classify :: (a -> Bool) -> [a] -> ([a], [a])
 classify _ [] = ([], [])

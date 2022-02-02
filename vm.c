@@ -314,8 +314,6 @@ void inst_slide(int_t n) {
     POP_N(node_ptr_t, n);
 }
 
-void inst_unwind(void);
-
 void inst_eval(void) {
     mem_reserve(sizeof(ptr_t));
     node_ptr_t p = PEEK(node_ptr_t);
@@ -323,16 +321,18 @@ void inst_eval(void) {
     PUSH(ptr_t, bp);
     bp = sp;
     PUSH(node_ptr_t, p);
-    inst_unwind();
-}
 
-void inst_unwind(void) {
     while (1) {
         node_ptr_t p = PEEK(node_ptr_t);
         int_t arity;
         switch (p->type) {
-        case NAPP: mem_reserve(sizeof(node_ptr_t)); PUSH(node_ptr_t, p->left); break;
-        case NIND: PEEK(node_ptr_t) = p->to; break;
+        case NAPP:
+            mem_reserve(sizeof(node_ptr_t)); 
+            PUSH(node_ptr_t, p->left); 
+            break;
+        case NIND: 
+            PEEK(node_ptr_t) = p->to; 
+            break;
         case NGLOBAL:
             arity = p->g_arity;
             if (bp - sp >= (arity + 1) * sizeof(node_ptr_t)) {
@@ -359,8 +359,19 @@ void inst_unwind(void) {
     }
 }
 
+
 void inst_pop(int_t n) {
     POP_N(node_ptr_t, n);
+}
+
+void inst_alloc(int_t n) {
+    mem_reserve(n * (NODE_SIZE(0) + sizeof(node_ptr_t)));
+    for (int_t i = 0; i < n; ++i) {
+        node_ptr_t p = node_alloc(NODE_SIZE(0));
+        p->type = NIND;
+        p->to = NULL;
+        PUSH(node_ptr_t, p);
+    }
 }
 
 #define INST_INT_ARITH_BINOP(op) \

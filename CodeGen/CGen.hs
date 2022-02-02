@@ -1,18 +1,20 @@
 module CodeGen.CGen (codeGen) where
 
 import Utils.Map
+import Common.Def
 import GM.Compile
 import GM.Def
 
 type CCode = String
+type GlobalDef = (Name, Node)
 
-initGlobals :: CompiledCore -> [(String, Node)]
+initGlobals :: CompiledCore -> [GlobalDef]
 initGlobals (cs, fs) = map initConstr cs ++ map initFn fs
 
-initConstr :: CompiledCoreConstr -> (String, Node)
+initConstr :: CompiledCoreConstr -> GlobalDef
 initConstr (n, a, _, c) = (n, NGlobal a c)
 
-initFn :: CompiledCoreFn -> (String, Node)
+initFn :: CompiledCoreFn -> GlobalDef
 initFn (n, a, c) = (n, NGlobal a c)
 
 codeGen :: CompiledCore -> CCode
@@ -24,23 +26,23 @@ codeGen p =
     nnl = initGlobals p
     initG = genInitGlobal nnl
 
-mangle :: String -> String
-mangle = ("f_" ++)
+mangle :: Name -> String
+mangle (Name (s, id)) = 'f' : show id ++ '_' : s
 
-mangleGOffset :: String -> String
+mangleGOffset :: Name -> String
 mangleGOffset name = mangle name ++ "_offset"
 
-genFnGOffset :: (String, Node) -> CCode
+genFnGOffset :: GlobalDef -> CCode
 genFnGOffset (name, _) = "int_t " ++ mangleGOffset name ++ ";\n"
 
-genFn :: (String, Node) -> CCode
+genFn :: GlobalDef -> CCode
 genFn (name, NGlobal _ code) =
   "void " ++ mangle name ++ "(void) {\n" ++
   genCode code ++
   "}\n"
 genFn (_, _) = error "genFn"
 
-genInitGlobal :: [(String, Node)] -> CCode
+genInitGlobal :: [GlobalDef] -> CCode
 genInitGlobal nnl =
   "static node_t global_funcs[" ++ show (length nnl) ++ "];\n" ++
   "void global_init(void) {\n" ++
@@ -48,7 +50,7 @@ genInitGlobal nnl =
   "globals = global_funcs;\n" ++
   concatMap allocInitGlobal (zip [0..] nnl) ++ "}\n"
 
-allocInitGlobal :: (Int, (String, Node)) -> CCode
+allocInitGlobal :: (Int, GlobalDef) -> CCode
 allocInitGlobal (offset, (name, NGlobal arity _)) =
   fNode ++ ".type = NGLOBAL;\n" ++
   fNode ++ ".g_arity = " ++ show arity ++ ";\n" ++
@@ -62,7 +64,7 @@ allocInitGlobal (offset, (name, NGlobal arity _)) =
     fNode = "global_funcs[" ++ offsetStr ++ "]"
     fNodePtr = "(global_funcs + " ++ offsetStr ++ ")"
     assignStartAddr =
-      if name == "start" then "entry_func_offset = " ++ offsetStr ++ ";\n" else ""
+      if getName name == "start" then "entry_func_offset = " ++ offsetStr ++ ";\n" else ""
 allocInitGlobal (_, _) = error "allocInitGlobal"
 
 genCode :: Code -> CCode
@@ -89,8 +91,6 @@ genInstr (Slide n) =
   "inst_slide(" ++ show n ++ ");\n"
 genInstr Eval =
   "inst_eval();\n"
-genInstr Unwind =
-  "inst_unwind();\n"
 genInstr (Alloc n) =
   "inst_alloc(" ++ show n ++ ");\n"
 genInstr Add =

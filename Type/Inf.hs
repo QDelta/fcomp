@@ -5,14 +5,17 @@ import Utils.Map
 import Utils.Set
 import Utils.Graph
 import Utils.State
-import Parser.AST
+import Common.Def
+import Common.AST
 import Type.Def
+import Prim.Name
+import Prim.Type
 
 -- data type with only constant constructors can be translate to integers
-type DTMap = Map String (Int, Bool) -- number of type parameters, is number type
-type FTMap = Map String PType
-type CTMap = Map String PType
-type LTMap = Map String MType
+type DTMap = Map String DataAttr
+type FTMap = Map Name PType
+type CTMap = Map Name PType
+type LTMap = Map Name MType
 type VTMap = Map Int MType
 
 data TypeEnv = TypeEnv
@@ -86,57 +89,59 @@ newTypeVar = State $
 newTypeVars :: Int -> TState [MType]
 newTypeVars n = traverse (const newTypeVar) (replicate n ())
 
-depGroupSort :: Set String -> [FnDef] -> [[FnDef]]
-depGroupSort constrNames defs = strongCCs depGraph
+depGroupSort :: Set Ident -> [FnDef Name] -> [[FnDef Name]]
+depGroupSort constrIds defs = strongCCs depGraph
   where
-    depGraph = genDepGraph constrNames defs
+    depGraph = genDepGraph constrIds defs
 
 -- (f1, f2) in E : f1 (indirectly) calls f2
-genDepGraph :: Set String -> [FnDef] -> [(FnDef, String, [String])]
-genDepGraph constrNames = map genDep
+genDepGraph :: Set Ident -> [FnDef Name] -> Graph Ident (FnDef Name)
+genDepGraph constrIds = map genDep
   where
     genDep def@(FnDef name params body) =
-      (def, name, sToList $ directDepsExpr knowns body)
+      (def, getIdent name, sToList $ directDepsExpr knowns body)
       where
-        knowns = sUnion constrNames (sFromList params)
+        knowns = foldl sInsert constrIds (map getIdent params)
 
-directDepsExpr :: Set String -> Expr -> Set String
+directDepsExpr :: Set Ident -> Expr Name -> Set Ident
 directDepsExpr locals expr = case expr of
   IntE _ -> emptySet
-  VarE name -> if name `sElem` locals then emptySet else sSingleton name
+  VarE name ->
+    let id = getIdent name in
+      if id `sElem` locals then emptySet else sSingleton id
   AppE l r -> sUnion (deps l) (deps r)
   CaseE e brs -> sUnion (deps e) (directDepsBranches locals brs)
   where deps = directDepsExpr locals
 
-directDepsBranches :: Set String -> [Branch] -> Set String
+directDepsBranches :: Set Ident -> [Branch Name] -> Set Ident
 directDepsBranches locals brs =
   foldl sUnion emptySet (map dDepBr brs)
   where
-    dDepBr :: Branch -> Set String
+    dDepBr :: Branch Name -> Set Ident
     dDepBr (constr, params, expr) =
-      directDepsExpr (sUnion locals (sFromList params)) expr
+      directDepsExpr (foldl sInsert locals (map getIdent params)) expr
 
-exConstrs :: [DataDef] -> Set String
-exConstrs defs = foldl sUnion emptySet (map ex defs)
-  where ex (DataDef _ _ constrs) = sFromList $ map fst constrs
-
-infer :: Program -> String
+infer :: Program Name -> String
 infer prog = show env
   where env = execState (inferProgram prog) initialTypeEnv
 
-inferProgram :: Program -> TState ()
+inferProgram :: Program Name -> TState ()
 inferProgram (dataDefs, fnDefs) = do
   traverse_ constructData dataDefs
   traverse_ inferData dataDefs
-  let constrNames = exConstrs dataDefs
-  let fnGrps = depGroupSort constrNames fnDefs
+  let constrIds = exConstrs dataDefs
+  let fnGrps = depGroupSort constrIds fnDefs
   traverse_ inferGroup fnGrps
 
-constructData :: DataDef -> TState ()
+exConstrs :: [DataDef Name] -> Set Ident
+exConstrs defs = foldl sUnion emptySet (map ex defs)
+  where ex (DataDef _ _ constrs) = sFromList $ map (getIdent . fst) constrs
+
+constructData :: DataDef Name -> TState ()
 constructData (DataDef name tparams constrs) =
   bindD (name, (length tparams, all (null . snd) constrs))
 
-inferData :: DataDef -> TState ()
+inferData :: DataDef Name -> TState ()
 inferData (DataDef name tpNames constrs) = do
   traverse_ inferConstr constrs
   where
@@ -144,7 +149,7 @@ inferData (DataDef name tpNames constrs) = do
     tpMap = mFromList (zip tpNames tparams)
     dType = DataT name (map VarT tparams)
 
-    inferConstr :: Constructor -> TState ()
+    inferConstr :: Constructor Name -> TState ()
     inferConstr (name, tss) = do
       types <- traverse tsToType tss
       let cType = Forall (sFromList tparams) (foldr ArrT dType types)
@@ -168,37 +173,37 @@ inferData (DataDef name tpNames constrs) = do
       types <- traverse tsToType tss
       return (DataT name' types)
 
-inferGroup :: [FnDef] -> TState ()
+inferGroup :: [FnDef Name] -> TState ()
 inferGroup group = do
   inferGroupM group
   let names = map (\(FnDef name _ _) -> name) group
-  mtypes <- traverse (getL . (\n -> assertJust . mLookup n)) names
+  mtypes <- traverse (getL . (\n -> (! n))) names
   ptypes <- traverse generalize mtypes
   traverse_ bindF $ zip names ptypes
   clearInfer
 
-inferGroupM :: [FnDef] -> TState ()
+inferGroupM :: [FnDef Name] -> TState ()
 inferGroupM group = do
   traverse_ constrFn group
   traverse_ inferFn group
 
-constrFn :: FnDef -> TState ()
+constrFn :: FnDef Name -> TState ()
 constrFn (FnDef name params _) = do
   ptypes <- newTypeVars (length params)
   retType <- newTypeVar
   let fType = foldr ArrT retType ptypes
   bindL (name, fType)
 
-inferFn :: FnDef -> TState ()
+inferFn :: FnDef Name -> TState ()
 inferFn (FnDef name params body) = do
-  fType <- getL (assertJust . mLookup name)
+  fType <- getL (! name)
   let (binds, retType) = paramBind params fType
   traverse_ bindL binds
   bType <- inferExpr body
   unify retType bType
   traverse_ (setL . mRemove) params
 
-inferExpr :: Expr -> TState MType
+inferExpr :: Expr Name -> TState MType
 inferExpr (IntE _) = return mIntT
 inferExpr (VarE name) = do
   maybel <- getL (mLookup name)
@@ -212,7 +217,7 @@ inferExpr (VarE name) = do
           maybec <- getC (mLookup name)
           case maybec of
             Just t -> instantiate t
-            Nothing -> typeError $ "undefined name " ++ name
+            Nothing -> typeError $ "undefined name " ++ getName name
 inferExpr (AppE l r) = do
   lt <- inferExpr l
   rt <- inferExpr r
@@ -228,12 +233,12 @@ inferExpr (CaseE expr brs) = do
   traverse_ (unify brType) actualBrTs
   return brType
 
-inferBr :: Branch -> TState (MType, MType)
+inferBr :: Branch Name -> TState (MType, MType)
 inferBr (constr, params, body) = do
   maybep <- getC (mLookup constr)
   cTypeP <- case maybep of
     Just t -> return t
-    Nothing -> typeError $ "undefined constructor " ++ constr
+    Nothing -> typeError $ "undefined constructor " ++ getName constr
   cType <- instantiate cTypeP
   let (binds, patType) = paramBind params cType
   traverse_ bindL binds
@@ -245,7 +250,7 @@ inferBr (constr, params, body) = do
     assertDataT _ = error "pattern with non-data type"
 
 -- params -> function type -> (binds, return type)
-paramBind :: [String] -> MType -> ([(String, MType)], MType)
+paramBind :: [Name] -> MType -> ([(Name, MType)], MType)
 paramBind [] t = ([], t)
 paramBind (n : ns) (ArrT t1 t2) = ((n, t1) : restBind, ret)
   where (restBind, ret) = paramBind ns t2
@@ -330,39 +335,21 @@ generalize t = do
     freeVarsR (ArrT l r) = freeVarsR l `sUnion` freeVarsR r
     freeVarsR (DataT n ts) = foldl sUnion emptySet (map freeVarsR ts)
 
-mIntT, mBoolT :: MType
-mIntT = DataT "Int" []
-mBoolT = DataT "Bool" []
+primData :: DTMap
+primData = primDataAttrs
 
 primFn :: FTMap
-primFn = mFromList
-  [ ("add", Forall emptySet $ ArrT mIntT (ArrT mIntT mIntT)),
-    ("sub", Forall emptySet $ ArrT mIntT (ArrT mIntT mIntT)),
-    ("mul", Forall emptySet $ ArrT mIntT (ArrT mIntT mIntT)),
-    ("div", Forall emptySet $ ArrT mIntT (ArrT mIntT mIntT)),
-    ("rem", Forall emptySet $ ArrT mIntT (ArrT mIntT mIntT)),
-    ("eq",  Forall emptySet $ ArrT mIntT (ArrT mIntT mBoolT)),
-    ("gt",  Forall emptySet $ ArrT mIntT (ArrT mIntT mBoolT)),
-    ("lt",  Forall emptySet $ ArrT mIntT (ArrT mIntT mBoolT)),
-    ("ne",  Forall emptySet $ ArrT mIntT (ArrT mIntT mBoolT)),
-    ("ge",  Forall emptySet $ ArrT mIntT (ArrT mIntT mBoolT)),
-    ("le",  Forall emptySet $ ArrT mIntT (ArrT mIntT mBoolT)),
-    ("or",  Forall emptySet $ ArrT mBoolT (ArrT mBoolT mBoolT)),
-    ("and", Forall emptySet $ ArrT mBoolT (ArrT mBoolT mBoolT)),
-    ("not", Forall emptySet $ ArrT mBoolT mBoolT)
-  ]
-
-primData :: DTMap
-primData = mFromList
-  [ ("Int",  (0, True)),
-    ("Bool", (0, True)),
-    ("List", (1, False))
-  ]
+primFn =
+  foldl
+    (\m (s, typ) ->
+      mInsert (primNames ! s, typ) m)
+    emptyMap
+    (mToList primFnTypes)
 
 primConstr :: CTMap
-primConstr = mFromList
-  [ ("False", Forall emptySet mBoolT),
-    ("True",  Forall emptySet mBoolT),
-    ("Nil",   Forall (sSingleton 0) $ DataT "List" [VarT 0]),
-    ("Cons",  Forall (sSingleton 0) $ ArrT (VarT 0) $ ArrT (DataT "List" [VarT 0]) (DataT "List" [VarT 0]))
-  ]
+primConstr =
+  foldl
+    (\m (s, typ) ->
+      mInsert (primNames ! s, typ) m)
+    emptyMap
+    (mToList primConstrTypes)

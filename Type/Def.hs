@@ -10,6 +10,8 @@ data MType
 
 data PType = Forall (Set Int) MType
 
+type DataAttr = (Int, Bool) -- number of type parameters, is number type
+
 instance Show MType where
   show t = case t of
     VarT n -> 't' : show n
