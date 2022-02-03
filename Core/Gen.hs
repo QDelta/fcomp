@@ -49,27 +49,34 @@ genCoreExpr cCons lm (CaseE e brs) =
     ce = genCoreExpr cCons lm e
     coreBrs = map (genCoreBranch cCons lm) brs
 genCoreExpr cCons lm (LetE binds e) =
-  undefined
+  foldr
+    (\grp ce ->
+      case grp of
+        []  -> undefined
+        [b] -> LetCE b ce
+        _   -> LetRecCE grp ce)
+    (genCoreExpr cCons newLM e)
+    bindCEGrps
   where
     (names, bindExprs) = unzip binds
-    nameSet = sFromList (map getIdent names)
-    test = map (\(n, e) -> (e, n, depOf e)) binds
-    depOf :: Expr Name -> Set Ident
-    depOf (IntE _) = emptySet
-    depOf (VarE name) =
-      let id = getIdent name in
-      if id `sElem` nameSet then sSingleton id else emptySet
-    depOf (AppE e1 e2) = depOf e1 `sUnion` depOf e2
-    depOf (CaseE e brs) =
-      depOf e `sUnion` undefined
+    bindIdents = map getIdent names
+    identSet = sFromList bindIdents
+    depGraph =
+      map
+      (\(n, e) ->
+        (e, getIdent n, sToList $ depsOfExprIn identSet e))
+      binds
+    bindExprGrps = strongCCs depGraph
+    newLM = foldl (flip mInsert) lm (zip bindIdents [mSize lm..])
+    bindCEGrps = map (map (genCoreExpr cCons newLM)) bindExprGrps
 
 genCoreBranch :: [CoreConstr] -> LOffSetMap -> Branch Name -> CoreBranch
-genCoreBranch cCons lm (name, binds, e) = (arity, tag, ce)
+genCoreBranch cCons lm (name, binds, e) =
+  (arity, tag, genCoreExpr cCons newLM e)
   where
     atMap = mFromList $ map (\(n, a, t) -> (n, (a, t))) cCons
-    (arity, tag) = assertJust $ mLookup name atMap
-    tmpLM = foldr mInsert lm (zip (map getIdent binds) [mSize lm..])
-    ce = genCoreExpr cCons tmpLM e
+    (arity, tag) = atMap ! name
+    newLM = foldl (flip mInsert) lm (zip (map getIdent binds) [mSize lm..])
 
 initialCore :: CoreProgram
 initialCore = (initialCoreConstrs, [])

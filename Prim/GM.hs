@@ -37,7 +37,7 @@ prim1Insts = primBool1Insts
 
 compilePrimFn :: Int -> (String, Instruction) -> (Name, Int, Code)
 compilePrimFn arity (name, inst) =
-  (primNames ! name, arity, 
+  (primNames ! name, arity,
     concat (replicate arity [Push (arity - 1), Eval]) ++ [inst, Update arity, Pop arity])
 
 compiledPrimFns :: [(Name, Int, Code)]

@@ -67,12 +67,12 @@ compileWHNF f (LetCE bindE e) =
   compileLazy f bindE ++ compileWHNF (pushStack f 1) e ++ [Slide 1]
 compileWHNF f (LetRecCE bindEs e) =
   Alloc n :
-       concatMap compLetR (zip bindEs [1..])
+       concatMap compLetR (zip bindEs [0..])
     ++ compileWHNF newF e ++ [Slide n]
   where
     n = length bindEs
     newF = pushStack f n
-    compLetR (bindE, offset) = compileLazy newF bindE ++ [Update (n - offset)]
+    compLetR (bindE, offset) = compileLazy newF bindE ++ [Update offset]
 compileWHNF f e = compileLazy f e ++ [Eval]
 
 -- create a thunk on stack
@@ -89,12 +89,12 @@ compileLazy f (LetCE bindE e) =
   compileLazy f bindE ++ compileLazy (pushStack f 1) e ++ [Slide 1]
 compileLazy f (LetRecCE bindEs e) =
   Alloc n :
-       concatMap compLetR (zip bindEs [1..])
+       concatMap compLetR (zip bindEs [0..])
     ++ compileLazy newF e ++ [Slide n]
   where
     n = length bindEs
     newF = pushStack f n
-    compLetR (bindE, offset) = compileLazy newF bindE ++ [Update (n - offset)]
+    compLetR (bindE, offset) = compileLazy newF bindE ++ [Update offset]
 
 compileBranches :: Frame -> [CoreBranch] -> [(Int, Code)]
 compileBranches f = map (compileBranch f)

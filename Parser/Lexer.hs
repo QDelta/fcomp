@@ -12,20 +12,20 @@ tlex s = case s of
     | isLowerAlpha c -> callLex (nameLex LNameTok)
     | otherwise -> callLex symLex
   where
-    callLex f = toks
+    callLex :: (String -> (Token, String)) -> [Token]
+    callLex lexer = toks
       where
-        (tok, rest) = f s
+        (tok, rest) = lexer s
         toks =
           if tok == LineComment then
-            tlex (skipUntil '\n' rest)
+            tlex (skipLine rest)
           else
             tok : tlex rest
-
-skipUntil :: Char -> String -> String
-skipUntil c [] = []
-skipUntil c (h : t)
-  | h == c    = t
-  | otherwise = skipUntil c t
+    skipLine :: String -> String
+    skipLine [] = []
+    skipLine (c : s)
+      | c == '\n' = s
+      | otherwise = skipLine s
 
 isSpace :: Char -> Bool
 isSpace = (`elem` " \t\r\n")

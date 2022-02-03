@@ -1,5 +1,6 @@
 module Common.AST where
 
+import Utils.Set
 import Common.Def
 
 data TypeSig
@@ -30,3 +31,26 @@ data FnDef v =
   deriving (Show)
 
 type Program v = ([DataDef v], [FnDef v])
+
+depsOfExprIn :: Set Ident -> Expr Name -> Set Ident
+depsOfExprIn _ (IntE _) = emptySet
+depsOfExprIn knowns (VarE v) =
+  let id = getIdent v in
+  if sElem id knowns then sSingleton id else emptySet
+depsOfExprIn knowns (AppE e1 e2) =
+  depOf e1 `sUnion` depOf e2
+  where depOf = depsOfExprIn knowns
+depsOfExprIn knowns (CaseE e brs) =
+  foldl sUnion (depsOfExprIn knowns e) (map depsOfBr brs)
+  where
+    depsOfBr (_, brBinds, body) =
+      depsOfExprIn newKnowns body
+      where
+        newKnowns = foldl sRemove knowns (map getIdent brBinds)
+depsOfExprIn knowns (LetE binds e) =
+  foldl sUnion (depsOf e) (map depsOf bindExprs)
+  where
+    (bindNames, bindExprs) = unzip binds
+    bindIdents = map getIdent bindNames
+    newKnowns = foldl sRemove knowns bindIdents
+    depsOf = depsOfExprIn newKnowns

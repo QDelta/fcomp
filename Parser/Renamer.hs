@@ -45,7 +45,9 @@ renameData initEnv (DataDef name tps constrs) =
 
 renameFn :: RenameEnv -> FnDef RdrName -> FnDef Name
 renameFn initEnv (FnDef fName params body) =
-  FnDef newFName newParams newBody
+  case checkUnique params of
+    Just s -> error $ "duplicate parameter" ++ s
+    Nothing -> FnDef newFName newParams newBody
   where
     newFName = ((! fName) . fst) initEnv
     (newParams, env) = mapAccumL addBind initEnv params
@@ -66,13 +68,17 @@ renameExpr env (CaseE e brs) =
   where
     renameE = renameExpr env
     renameBr (cons, bindNames, body) =
-      (newCons, newBindNames, newBody)
+      case checkUnique bindNames of
+        Just s -> error $ "duplicate bind" ++ s
+        Nothing -> (newCons, newBindNames, newBody)
       where
         newCons = ((! cons) . fst) env
         (newBindNames, newEnv) = mapAccumL addBind env bindNames
         newBody = renameExpr newEnv body
 renameExpr env (LetE binds e) =
-  LetE newBinds (renameE e)
+  case checkUnique bindNames of
+    Just s -> error $ "duplicate bind" ++ s
+    Nothing ->LetE newBinds (renameE e)
   where
     (bindNames, bindEs) = unzip binds
     (newBindNames, newEnv) = mapAccumL addBind env bindNames
