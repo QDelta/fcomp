@@ -55,3 +55,6 @@ classify f (x : xs)
 
 traverse_ :: (Traversable t, Applicative f) => (a -> f b) -> t a -> f ()
 traverse_ f l = () <$ traverse f l
+
+bimap :: (a -> b) -> (c -> d) -> (a, c) -> (b, d)
+bimap f1 f2 (x, y) = (f1 x, f2 y)

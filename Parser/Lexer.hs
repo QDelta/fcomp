@@ -87,5 +87,6 @@ symbols =
     ("|",  Or    ),
     (";",  SemiC ),
     ("=",  Equal ),
+    ("\\", BSlash),
     ("--", LineComment)
   ]

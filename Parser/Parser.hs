@@ -10,7 +10,7 @@ data Token
   = LParen | RParen
   | LBrace | RBrace
   | DataKW | CaseKW | OfKW  | LetKW | InKW
-  | Arrow  | SemiC  | Equal | Or
+  | Arrow  | SemiC  | Equal | Or    | BSlash
   | LineComment
   | UNameTok String
   | LNameTok String
@@ -116,6 +116,12 @@ pExpr =
     psym InKW
     LetE binds <$> pExpr
   ) <|>
+  -- (do
+  --   psym BSlash
+  --   params <- pplus pLName
+  --   psym Arrow
+  --   LambdaE params <$> pExpr
+  -- ) <|>
   (do
     es <- pplus pExprAtom
     return (foldl1 AppE es)

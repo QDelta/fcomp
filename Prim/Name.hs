@@ -1,6 +1,7 @@
 module Prim.Name where
 
 import Common.Def
+import Utils.Set
 import Utils.Map
 
 primNames :: Map RdrName Name
@@ -24,3 +25,6 @@ primNames = mFromList
     ("Nil",   Name ("Nil",   16)),
     ("Cons",  Name ("Cons",  17))
   ]
+
+primIdents :: Set Ident
+primIdents = sFromList [0..17]

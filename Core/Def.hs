@@ -5,16 +5,17 @@ import Common.Def
 -- Core is not strongly typed
 data CoreExpr
   = GVarCE Name
-  | LVarCE Int
+  | LVarCE Ident
   | IntCE  Int
   | AppCE CoreExpr CoreExpr
   | CaseCE CoreExpr [CoreBranch]
-  | LetCE CoreExpr CoreExpr            -- bind, expression
-  | LetRecCE [CoreExpr] CoreExpr       -- rec binds, expresstion
+  | LetCE CoreBind CoreExpr            -- bind, expression
+  | LetRecCE [CoreBind] CoreExpr       -- rec binds, expresstion
   deriving (Show)
 
-type CoreBranch = (Int, Int, CoreExpr) -- arity, tag, body
-type CoreConstr = (Name, Int, Int)     -- name, arity, tag
-type CoreFn = (Name, Int, CoreExpr)    -- name, arity, body
+type CoreBind = (Ident, CoreExpr)
+type CoreBranch = (Int, [Ident], CoreExpr) -- tag, binds, body
+type CoreConstr = (Name, Int, Int)         -- name, arity, tag
+type CoreFn = (Name, [Ident], CoreExpr)    -- name, params, body
 
 type CoreProgram = ([CoreConstr], [CoreFn])

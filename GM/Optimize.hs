@@ -8,10 +8,10 @@ optGM :: CompiledCore -> CompiledCore
 optGM (constrs, fns) = (map optConstr constrs, map optFn fns)
 
 optConstr :: CompiledCoreConstr -> CompiledCoreConstr
-optConstr (name, arity, tag, code) = (name, arity, tag, peephole code)
+optConstr (name, arity, tag, code) = (name, arity, tag, (peephole . peephole) code)
 
 optFn :: CompiledCoreFn -> CompiledCoreFn
-optFn (name, arity, code) = (name, arity, peephole code)
+optFn (name, arity, code) = (name, arity, (peephole . peephole) code)
 
 peephole :: [Instruction] -> [Instruction]
 peephole code =
@@ -21,10 +21,16 @@ peephole code =
       peephole rest
     Pop n   : rest | n == 0 ->
       peephole rest
+    Pop n : Pop m : rest ->
+      peephole $ Pop (n + m) : rest
+    Slide n : Pop m : rest ->
+      peephole $ Pop (n + m) : rest
+    Slide n : Slide m : rest ->
+      peephole $ Slide (n + m) : rest
     Eval : Slide n : rest ->
-      peephole (Slide n : Eval : rest)
+      peephole $ Slide n : Eval : rest
     Eval : Update n : Pop m : rest | n >= m ->
-      peephole (Slide m : Eval : Update (n - m) : rest)
+      peephole $ Slide m : Eval : Update (n - m) : rest
     Jump brs : rest ->
       [Jump $ map (second (peephole . (++ rest))) brs] -- merge rest instructions into branch
     ins : rest -> ins : peephole rest

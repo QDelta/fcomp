@@ -17,93 +17,96 @@ type CompiledCoreFn = (Name, Int, Code)          -- name, arity, code
 type CompiledCoreConstr = (Name, Int, Int, Code) -- name, arity, tag, code
 type CompiledCore = ([CompiledCoreConstr], [CompiledCoreFn])
 
-type Frame = ([Int], Int)
+type Stack = [(Int, Map Ident Int)] -- nested maps for stack offset
+
+-- params are pushed from right to left
 -- bindings on stack: (top) $5, $6, $2, $3, $4, $0, $1 (bottom)
--- => fst Frame = [5, 2], represents $5, .., $2, .., $0, ..
---    snd Frame = length [$5, $6] = 2
 
-getTop :: [Int] -> Int
-getTop [] = 0
-getTop (m : _) = m
+getOffset :: Stack -> Ident -> Int
+getOffset [] _ = undefined
+getOffset ((o, m) : rest) id =
+  case mLookup id m of
+    Just i -> i
+    Nothing -> o + getOffset rest id
 
-initialFrame :: Int -> Frame
-initialFrame n = ([], n)
+pushBinds :: Stack -> [Ident] -> Stack
+pushBinds st ids =
+  (length ids, mFromList $ zip ids [0..]) : st
 
-pushStack :: Frame -> Int -> Frame
-pushStack (ms, count) n = (newMin : ms, n)
-  where newMin = count + getTop ms
+push :: Stack -> Int -> Stack
+push st n = (n, emptyMap) : st
 
-popStack :: Frame -> Frame
-popStack ([], _) = ([], 0)
-popStack (min : rest, count) = (rest, newCount)
-  where newCount = min - getTop rest
-
-getOffset :: Frame -> Int -> Int
-getOffset f@(ms, count) n =
-  if n >= min then n - min else count + nextOffset
-  where
-    min = getTop ms
-    nextOffset = getOffset (popStack f) n
+emptyStack :: Stack
+emptyStack = []
 
 compileFn :: CoreFn -> CompiledCoreFn
-compileFn (n, a, b) = (n, a, code ++ clean)
+compileFn (name, params, body) =
+  (name, arity, code ++ clean)
   where
-    code = compileWHNF (initialFrame a) b
-    clean = [Update a, Pop a]
+    arity = length params
+    code = compileWHNF (pushBinds emptyStack params) body
+    clean = [Update arity, Pop arity]
 
 -- eval expr to WHNF on stack
-compileWHNF :: Frame -> CoreExpr -> Code
-compileWHNF _ (IntCE n) = [PushI n]
-compileWHNF f (CaseCE e brs) = compileWHNF f e ++ [Jump (compileBranches f brs)]
-compileWHNF f e@(AppCE (GVarCE op) opr) =
+compileWHNF :: Stack -> CoreExpr -> Code
+compileWHNF _ (IntCE n) =
+  [PushI n]
+compileWHNF st (CaseCE e brs) =
+  compileWHNF st e ++ [Jump (compileBranches st brs)]
+compileWHNF st e@(AppCE (GVarCE op) opr) =
   case mLookup (getIdent op) prim1 of
-    Just inst -> compileWHNF f opr ++ [inst]
-    Nothing -> compileLazy f e ++ [Eval]
-compileWHNF f e@(AppCE (AppCE (GVarCE op) opr1) opr2) =
+    Just inst -> compileWHNF st opr ++ [inst]
+    Nothing -> compileLazy st e ++ [Eval]
+compileWHNF st e@(AppCE (AppCE (GVarCE op) opr1) opr2) =
   case mLookup (getIdent op) prim2 of
-    Just inst -> compileWHNF f opr2 ++ compileWHNF (pushStack f 1) opr1 ++ [inst]
-    Nothing -> compileLazy f e ++ [Eval]
-compileWHNF f (LetCE bindE e) =
-  compileLazy f bindE ++ compileWHNF (pushStack f 1) e ++ [Slide 1]
-compileWHNF f (LetRecCE bindEs e) =
+    Just inst -> compileWHNF st opr2 ++ compileWHNF (push st 1) opr1 ++ [inst]
+    Nothing -> compileLazy st e ++ [Eval]
+compileWHNF st (LetCE (bindId, bindE) e) =
+  compileLazy st bindE ++ compileWHNF (pushBinds st [bindId]) e ++ [Slide 1]
+compileWHNF st (LetRecCE binds e) =
   Alloc n :
        concatMap compLetR (zip bindEs [0..])
-    ++ compileWHNF newF e ++ [Slide n]
+    ++ compileWHNF newStack e ++ [Slide n]
   where
-    n = length bindEs
-    newF = pushStack f n
-    compLetR (bindE, offset) = compileLazy newF bindE ++ [Update offset]
+    n = length binds
+    (bindIds, bindEs) = unzip binds
+    newStack = pushBinds st bindIds
+    compLetR (bindE, offset) = compileLazy newStack bindE ++ [Update offset]
 compileWHNF f e = compileLazy f e ++ [Eval]
 
 -- create a thunk on stack
 -- TODO: lazy case: generate a function (lambda lifting)
-compileLazy :: Frame -> CoreExpr -> Code
-compileLazy _ (GVarCE name) = [PushG name]
-compileLazy f (LVarCE i) = [Push (getOffset f i)]
+compileLazy :: Stack -> CoreExpr -> Code
+compileLazy _ (GVarCE name) =
+  [PushG name]
+compileLazy st (LVarCE i) =
+  [Push (getOffset st i)]
 compileLazy _ (IntCE n) = [PushI n]
-compileLazy f (AppCE e1 e2) =
-  compileLazy f e2 ++ compileLazy (pushStack f 1) e1 ++ [MkApp]
-compileLazy f (CaseCE e brs) =
+compileLazy st (AppCE e1 e2) =
+  compileLazy st e2 ++ compileLazy (push st 1) e1 ++ [MkApp]
+compileLazy st (CaseCE e brs) =
   error "case expression in lazy environment are not implemented yet, use a function to wrap it."
-compileLazy f (LetCE bindE e) =
-  compileLazy f bindE ++ compileLazy (pushStack f 1) e ++ [Slide 1]
-compileLazy f (LetRecCE bindEs e) =
+compileLazy st (LetCE (bindId, bindE) e) =
+  compileLazy st bindE ++ compileLazy (pushBinds st [bindId]) e ++ [Slide 1]
+compileLazy st (LetRecCE binds e) =
   Alloc n :
        concatMap compLetR (zip bindEs [0..])
-    ++ compileLazy newF e ++ [Slide n]
+    ++ compileLazy newStack e ++ [Slide n]
   where
-    n = length bindEs
-    newF = pushStack f n
-    compLetR (bindE, offset) = compileLazy newF bindE ++ [Update offset]
+    n = length binds
+    (bindIds, bindEs) = unzip binds
+    newStack = pushBinds st bindIds
+    compLetR (bindE, offset) = compileLazy newStack bindE ++ [Update offset]
 
-compileBranches :: Frame -> [CoreBranch] -> [(Int, Code)]
-compileBranches f = map (compileBranch f)
+compileBranches :: Stack -> [CoreBranch] -> [(Int, Code)]
+compileBranches st = map (compileBranch st)
 
-compileBranch :: Frame -> CoreBranch -> (Int, Code)
-compileBranch f (a, t, b) = (t, code)
+compileBranch :: Stack -> CoreBranch -> (Int, Code)
+compileBranch st (tag, binds, body) =
+  (tag, code)
   where
-    code = Split : compileWHNF newF b ++ [Slide a]
-    newF = pushStack f a
+    code = Split : compileWHNF newStack body ++ [Slide (length binds)]
+    newStack = pushBinds st binds
 
 compileConstr :: CoreConstr -> CompiledCoreConstr
 compileConstr (name, arity, tag) =

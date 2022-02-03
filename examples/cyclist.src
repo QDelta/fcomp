@@ -8,7 +8,7 @@ take n l = case l of
   ; Cons h t -> ifte (eq 0 n) Nil (Cons h (take (sub n 1) t))
   };
 
--- typing the knot
+-- tying the knot
 start n =
   let 
     { x = Cons 1 y

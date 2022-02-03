@@ -11,78 +11,83 @@ import Core.Def
 import Prim.Name
 import Prim.Core
 
+type GlobalInfo = (Map Ident Int, Set Ident) -- constructor tag, global name
+
 genCore :: Program Name -> CoreProgram
 genCore (dataDefs, fnDefs) =
-  foldl addCoreFn (foldl addCoreData initialCore dataDefs) fnDefs
-
-addCoreData :: CoreProgram -> DataDef Name -> CoreProgram
-addCoreData (cCons, cFn) (DataDef name _ constrs) =
-  (addCoreConstrs constrs 0 cCons, cFn)
-
-addCoreConstrs :: [Constructor Name] -> Int -> [CoreConstr] -> [CoreConstr]
-addCoreConstrs [] _ x = x
-addCoreConstrs ((name, tSigs) : rest) tag cCons =
-  addCoreConstrs rest (tag + 1) newCCons
-  where newCCons = (name, length tSigs, tag) : cCons
-
-addCoreFn :: CoreProgram -> FnDef Name -> CoreProgram
-addCoreFn (cCons, cFn) (FnDef name params body) =
-  (cCons, (name, length params, cBody) : cFn)
+  (allConstrs, coreFns)
   where
-    cBody = genCoreExpr cCons lm body
-    lm = mFromList $ zip (map getIdent params) [0..]
+    allConstrs = primConstrs ++ defConstrs
+    defConstrs = concatMap genConstrs dataDefs
+    cMap = genConstrInfo allConstrs
+    gSet = genGIdents fnDefs defConstrs `sUnion` primIdents
+    gInfo = (cMap, gSet)
+    coreFns = map (genFn gInfo) fnDefs
 
-type LOffSetMap = Map Ident Int -- (local var, offset)
+genConstrInfo :: [CoreConstr] -> Map Ident Int
+genConstrInfo =
+  foldl (\m (n, a, t) -> mInsert (getIdent n, t) m) emptyMap
 
-genCoreExpr :: [CoreConstr] -> LOffSetMap -> Expr Name -> CoreExpr
-genCoreExpr _ _ (IntE n) = IntCE n
-genCoreExpr _ lm (VarE name) =
-  case mLookup (getIdent name) lm of
-    Just i -> LVarCE i
-    Nothing -> GVarCE name
-genCoreExpr cCons lm (AppE e1 e2) =
+genGIdents :: [FnDef Name] -> [CoreConstr] -> Set Ident
+genGIdents fnDefs constrs =
+           foldl (\s (FnDef n _ _) -> sInsert s (getIdent n)) emptySet fnDefs
+  `sUnion` foldl (\s (n, _, _) -> sInsert s (getIdent n)) emptySet constrs
+
+genConstrs :: DataDef Name -> [CoreConstr]
+genConstrs (DataDef name _ constrs) =
+  zipWith genC constrs [0..]
+  where
+    genC (name, tSigs) tag = (name, length tSigs, tag)
+
+genFn :: GlobalInfo -> FnDef Name -> CoreFn
+genFn gInfo (FnDef name params body) =
+  (name, map getIdent params, genExpr gInfo body)
+
+genExpr :: GlobalInfo -> Expr Name -> CoreExpr
+genExpr _ (IntE n) = IntCE n
+genExpr (_, gSet) (VarE name) =
+  let id = getIdent name in
+  if id `sElem` gSet then
+    GVarCE name
+  else
+    LVarCE id
+genExpr gInfo (AppE e1 e2) =
   AppCE (gen e1) (gen e2)
-  where gen = genCoreExpr cCons lm
-genCoreExpr cCons lm (CaseE e brs) =
+  where gen = genExpr gInfo
+genExpr gInfo (CaseE e brs) =
   CaseCE ce coreBrs
   where
-    ce = genCoreExpr cCons lm e
-    coreBrs = map (genCoreBranch cCons lm) brs
-genCoreExpr cCons lm (LetE binds e) =
+    ce = genExpr gInfo e
+    coreBrs = map (genBranch gInfo) brs
+genExpr gInfo (LetE binds e) =
   foldr
     (\grp ce ->
       case grp of
         []  -> undefined
         [b] -> LetCE b ce
         _   -> LetRecCE grp ce)
-    (genCoreExpr cCons newLM e)
+    (genExpr gInfo e)
     bindCEGrps
   where
-    (names, bindExprs) = unzip binds
-    bindIdents = map getIdent names
-    identSet = sFromList bindIdents
+    identSet = sFromList (map (getIdent . fst) binds)
     depGraph =
       map
       (\(n, e) ->
-        (e, getIdent n, sToList $ depsOfExprIn identSet e))
+        ((n, e), getIdent n, sToList $ depsOfExprIn identSet e))
       binds
     bindExprGrps = strongCCs depGraph
-    newLM = foldl (flip mInsert) lm (zip bindIdents [mSize lm..])
-    bindCEGrps = map (map (genCoreExpr cCons newLM)) bindExprGrps
+    bindCEGrps =
+      map (map (bimap getIdent (genExpr gInfo))) bindExprGrps
 
-genCoreBranch :: [CoreConstr] -> LOffSetMap -> Branch Name -> CoreBranch
-genCoreBranch cCons lm (name, binds, e) =
-  (arity, tag, genCoreExpr cCons newLM e)
+genBranch :: GlobalInfo -> Branch Name -> CoreBranch
+genBranch gInfo@(cMap, _) (name, binds, e) =
+  (tag, map getIdent binds, genExpr gInfo e)
   where
-    atMap = mFromList $ map (\(n, a, t) -> (n, (a, t))) cCons
-    (arity, tag) = atMap ! name
-    newLM = foldl (flip mInsert) lm (zip (map getIdent binds) [mSize lm..])
+    tag = cMap ! getIdent name
 
-initialCore :: CoreProgram
-initialCore = (initialCoreConstrs, [])
-  where
-    initialCoreConstrs =
-      map
-        (\(s, arity, tag) ->
-          (primNames ! s, arity, tag))
-        primCoreConstrs
+primConstrs :: [CoreConstr]
+primConstrs =
+  map
+    (\(s, arity, tag) ->
+      (primNames ! s, arity, tag))
+    primCoreConstrs
