@@ -90,7 +90,7 @@ newTypeVars :: Int -> TState [MType]
 newTypeVars n = traverse (const newTypeVar) (replicate n ())
 
 depGroupSort :: [FnDef Name] -> [[FnDef Name]]
-depGroupSort defs = strongCCs (genDepGraph defs)
+depGroupSort defs = map flattenSCC $ strongCCs (genDepGraph defs)
 
 -- (f1, f2) in E : f1 (indirectly) calls f2
 genDepGraph :: [FnDef Name] -> Graph Ident (FnDef Name)
@@ -223,7 +223,7 @@ inferExpr (LetE binds e) = do
       (\(n, e) ->
         (e, getIdent n, sToList $ depsOfExprIn identSet e))
       binds
-    bindExprGrps = strongCCs depGraph
+    bindExprGrps = map flattenSCC $ strongCCs depGraph
 
 inferBr :: Branch Name -> TState (MType, MType)
 inferBr (constr, params, body) = do

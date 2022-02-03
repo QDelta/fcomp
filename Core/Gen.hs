@@ -63,9 +63,8 @@ genExpr gInfo (LetE binds e) =
   foldr
     (\grp ce ->
       case grp of
-        []  -> undefined
-        [b] -> LetCE b ce
-        _   -> LetRecCE grp ce)
+        AcyclicSCC b -> LetCE b ce
+        CyclicSCC bs -> LetRecCE bs ce)
     (genExpr gInfo e)
     bindCEGrps
   where
@@ -77,7 +76,7 @@ genExpr gInfo (LetE binds e) =
       binds
     bindExprGrps = strongCCs depGraph
     bindCEGrps =
-      map (map (bimap getIdent (genExpr gInfo))) bindExprGrps
+      map (fmap (bimap getIdent (genExpr gInfo))) bindExprGrps
 
 genBranch :: GlobalInfo -> Branch Name -> CoreBranch
 genBranch gInfo@(cMap, _) (name, binds, e) =
