@@ -437,7 +437,7 @@ void print_head(const char *format) {
 }
 
 void print_stat() {
-    printf("GC: Count: %lld\n", stat_gc_count);
+    printf("GC Count: %lld\n", stat_gc_count);
 }
 
 int main(void) {

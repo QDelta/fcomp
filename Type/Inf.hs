@@ -18,6 +18,9 @@ type CTMap = Map Ident PType
 type LTMap = Map Ident MType
 type VTMap = Map Int MType
 
+type DataInfo = (String, DataAttr)
+type FnInfo = (String, PType)
+
 data TypeEnv = TypeEnv
   { dtmap :: DTMap -- global data types
   , ftmap :: FTMap -- global functions
@@ -26,12 +29,6 @@ data TypeEnv = TypeEnv
   , vtmap :: VTMap -- equations for type variables
   , index :: Int   -- unique id generator
   }
-
-instance Show TypeEnv where
-  show env =
-    "Data types:\n" ++ show (dtmap env) ++ "\n\n" ++
-    "Functions:\n" ++ show (ftmap env) ++ "\n\n" ++
-    "Constructors:\n" ++ show (ctmap env) ++ "\n"
 
 initialTypeEnv :: TypeEnv
 initialTypeEnv = TypeEnv
@@ -101,19 +98,29 @@ genDepGraph defs = map genDep defs
       (def, getIdent name, sToList $ depsOfExprIn fnIds body)
 
 infer :: Program Name -> String
-infer prog = show env
-  where env = execState (inferProgram prog) initialTypeEnv
+infer prog =
+  concatMap showData dataInfos ++ concatMap showFn fnInfos
+  where
+    (dataInfos, fnInfos) = evalState (inferProgram prog) initialTypeEnv
+    showData (name, (arity, _)) =
+      name ++ " :: " ++ concat (replicate arity "* -> ") ++ "*\n"
+    showFn (name, typ) =
+      name ++ " :: " ++ show typ ++ "\n"
 
-inferProgram :: Program Name -> TState ()
+inferProgram :: Program Name -> TState ([DataInfo], [FnInfo])
 inferProgram (dataDefs, fnDefs) = do
-  traverse_ constructData dataDefs
+  dataInfos <- traverse constructData dataDefs
   traverse_ inferData dataDefs
   let fnGrps = depGroupSort fnDefs
-  traverse_ inferGroup fnGrps
+  fnInfos <- concat <$> traverse inferGroup fnGrps
+  return (dataInfos, fnInfos)
 
-constructData :: DataDef Name -> TState ()
-constructData (DataDef name tparams constrs) =
-  bindD (name, (length tparams, all (null . snd) constrs))
+constructData :: DataDef Name -> TState DataInfo
+constructData (DataDef name tparams constrs) = do
+  bindD (name, attr)
+  return (name, attr)
+  where
+    attr = (length tparams, all (null . snd) constrs)
 
 inferData :: DataDef Name -> TState ()
 inferData (DataDef name tpNames constrs) = do
@@ -147,14 +154,16 @@ inferData (DataDef name tpNames constrs) = do
       types <- traverse tsToType tss
       return (DataT name' types)
 
-inferGroup :: [FnDef Name] -> TState ()
+inferGroup :: [FnDef Name] -> TState [FnInfo]
 inferGroup group = do
   inferGroupM group
   let names = map (\(FnDef name _ _) -> name) group
-  mtypes <- traverse (getL . (\n -> (! n)). getIdent) names
+  let fnIdents = map getIdent names
+  mtypes <- traverse (getL . \n -> (! n)) fnIdents
   ptypes <- traverse generalize mtypes
-  traverse_ bindF $ zip (map getIdent names) ptypes
+  traverse_ bindF $ zip fnIdents ptypes
   clearInfer
+  return $ zip (map getName names) ptypes
 
 inferGroupM :: [FnDef Name] -> TState ()
 inferGroupM group = do
