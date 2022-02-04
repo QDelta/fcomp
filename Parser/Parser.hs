@@ -116,12 +116,12 @@ pExpr =
     psym InKW
     LetE binds <$> pExpr
   ) <|>
-  -- (do
-  --   psym BSlash
-  --   params <- pplus pLName
-  --   psym Arrow
-  --   LambdaE params <$> pExpr
-  -- ) <|>
+  (do
+    psym BSlash
+    params <- pplus pLName
+    psym Arrow
+    LambdaE params <$> pExpr
+  ) <|>
   (do
     es <- pplus pExprAtom
     return (foldl1 AppE es)

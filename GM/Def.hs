@@ -5,6 +5,7 @@ import Common.Def
 
 data Instruction
   = PushG  Name
+  | PushL  Ident
   | PushI  Int
   | Push   Int
   | Pop    Int

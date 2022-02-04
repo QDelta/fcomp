@@ -12,7 +12,7 @@ zip = zipWith Pair;
 
 addP p = case p of { Pair x y -> add x y };
 
-zipWith f l1 l2 = 
+zipWith f l1 l2 =
   case l1 of
     { Nil -> Nil
     ; Cons h1 t1 -> case l2 of
@@ -21,16 +21,16 @@ zipWith f l1 l2 =
         }
     };
 
-map f l = 
+map f l =
   case l of
     { Nil -> Nil
     ; Cons h t -> Cons (f h) (map f t)
     };
 
-take n l = 
+take n l =
   case l of
     { Nil -> Nil
-    ; Cons h t -> 
+    ; Cons h t ->
         ifte (eq 0 n) Nil (Cons h (take (sub n 1) t))
     };
 

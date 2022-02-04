@@ -15,6 +15,7 @@ data Expr v
   | AppE (Expr v) (Expr v)
   | CaseE (Expr v) [Branch v]
   | LetE [Bind v] (Expr v)
+  | LambdaE [v] (Expr v)
   deriving (Show)
 
 type Bind v = (v, Expr v)                 -- name, expression
@@ -54,3 +55,7 @@ depsOfExprIn knowns (LetE binds e) =
     bindIdents = map getIdent bindNames
     newKnowns = foldl sRemove knowns bindIdents
     depsOf = depsOfExprIn newKnowns
+depsOfExprIn knowns (LambdaE params e) =
+  depsOfExprIn newKnowns e
+  where
+    newKnowns = foldl sRemove knowns (map getIdent params)

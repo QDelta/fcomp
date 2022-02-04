@@ -6,16 +6,22 @@ import GM.Compile
 import GM.Def
 
 type CCode = String
-type GlobalDef = (Name, Node)
+
+data GName = Named Name | Lifted Ident
+type GlobalDef = (GName, Int, Code)
 
 initGlobals :: CompiledCore -> [GlobalDef]
-initGlobals (cs, fs) = map initConstr cs ++ map initFn fs
+initGlobals (cs, fs, lfs) =
+  map initConstr cs ++ map initFn fs ++ map initLiftedFn lfs
 
 initConstr :: CompiledCoreConstr -> GlobalDef
-initConstr (n, a, _, c) = (n, NGlobal a c)
+initConstr (n, a, _, c) = (Named n, a, c)
 
 initFn :: CompiledCoreFn -> GlobalDef
-initFn (n, a, c) = (n, NGlobal a c)
+initFn (n, a, c) = (Named n, a, c)
+
+initLiftedFn :: CompiledLiftedFn -> GlobalDef
+initLiftedFn (id, a, c) = (Lifted id, a, c)
 
 codeGen :: CompiledCore -> CCode
 codeGen p =
@@ -26,21 +32,21 @@ codeGen p =
     nnl = initGlobals p
     initG = genInitGlobal nnl
 
-mangle :: Name -> String
-mangle (Name (s, id)) = 'f' : show id ++ '_' : s
+mangle :: GName -> String
+mangle (Named (Name (s, id))) = "f_" ++ show id ++ '_' : s
+mangle (Lifted id) = "lift_" ++ show id
 
-mangleGOffset :: Name -> String
+mangleGOffset :: GName -> String
 mangleGOffset name = mangle name ++ "_offset"
 
 genFnGOffset :: GlobalDef -> CCode
-genFnGOffset (name, _) = "int_t " ++ mangleGOffset name ++ ";\n"
+genFnGOffset (name, _, _) = "int_t " ++ mangleGOffset name ++ ";\n"
 
 genFn :: GlobalDef -> CCode
-genFn (name, NGlobal _ code) =
+genFn (name, _, code) =
   "void " ++ mangle name ++ "(void) {\n" ++
   genCode code ++
   "}\n"
-genFn (_, _) = error "genFn"
 
 genInitGlobal :: [GlobalDef] -> CCode
 genInitGlobal nnl =
@@ -51,7 +57,7 @@ genInitGlobal nnl =
   concatMap allocInitGlobal (zip [0..] nnl) ++ "}\n"
 
 allocInitGlobal :: (Int, GlobalDef) -> CCode
-allocInitGlobal (offset, (name, NGlobal arity _)) =
+allocInitGlobal (offset, (name, arity, _)) =
   fNode ++ ".type = NGLOBAL;\n" ++
   fNode ++ ".g_arity = " ++ show arity ++ ";\n" ++
   fNode ++ ".code = " ++ mangle name ++ ";\n" ++
@@ -64,15 +70,19 @@ allocInitGlobal (offset, (name, NGlobal arity _)) =
     fNode = "global_funcs[" ++ offsetStr ++ "]"
     fNodePtr = "(global_funcs + " ++ offsetStr ++ ")"
     assignStartAddr =
-      if getName name == "start" then "entry_func_offset = " ++ offsetStr ++ ";\n" else ""
-allocInitGlobal (_, _) = error "allocInitGlobal"
+      case name of
+        Named (Name (s, _)) | s == "start" ->
+          "entry_func_offset = " ++ offsetStr ++ ";\n"
+        _ -> ""
 
 genCode :: Code -> CCode
 genCode = concatMap genInstr
 
 genInstr :: Instruction -> CCode
 genInstr (PushG name) =
-  "inst_pushg(" ++ mangleGOffset name ++ ");\n"
+  "inst_pushg(" ++ mangleGOffset (Named name) ++ ");\n"
+genInstr (PushL id) =
+  "inst_pushg(" ++ mangleGOffset (Lifted id) ++ ");\n"
 genInstr (PushI n) =
   "inst_pushi(" ++ show n ++ ");\n"
 genInstr (Push o) =

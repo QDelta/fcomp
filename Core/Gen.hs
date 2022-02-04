@@ -77,6 +77,8 @@ genExpr gInfo (LetE binds e) =
     bindExprGrps = strongCCs depGraph
     bindCEGrps =
       map (fmap (bimap getIdent (genExpr gInfo))) bindExprGrps
+genExpr gInfo (LambdaE params e) =
+  LambdaCE (map getIdent params) (genExpr gInfo e)
 
 genBranch :: GlobalInfo -> Branch Name -> CoreBranch
 genBranch gInfo@(cMap, _) (name, binds, e) =

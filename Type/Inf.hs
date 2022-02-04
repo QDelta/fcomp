@@ -210,20 +210,23 @@ inferExpr (CaseE expr brs) = do
 inferExpr (LetE binds e) = do
   bindTypes <- newTypeVars (length binds)
   traverse_ bindL (zip bindIdents bindTypes)
-  grpTypes <- traverse (traverse inferExpr) bindExprGrps
-  let bindETypes = concat grpTypes
-  traverse_ (uncurry unify) (zip bindTypes bindETypes)
+  let depGraph = zipWith (\t (n, e) -> ((t, e), getIdent n, depList e)) bindTypes binds
+  let reorderedBinds = concatMap flattenSCC $ strongCCs depGraph
+  let (rTypes, rExprs) = unzip reorderedBinds
+  rInfTypes <- traverse inferExpr rExprs
+  traverse_ (uncurry unify) (zip rTypes rInfTypes)
   inferExpr e
   where
     (names, bindExprs) = unzip binds
     bindIdents = map getIdent names
     identSet = sFromList bindIdents
-    depGraph =
-      map
-      (\(n, e) ->
-        (e, getIdent n, sToList $ depsOfExprIn identSet e))
-      binds
-    bindExprGrps = map flattenSCC $ strongCCs depGraph
+    depList e = sToList $ depsOfExprIn identSet e
+
+inferExpr (LambdaE params e) = do
+  ptypes <- newTypeVars (length params)
+  traverse_ bindL (zip (map getIdent params) ptypes)
+  eType <- inferExpr e
+  return $ foldr ArrT eType ptypes
 
 inferBr :: Branch Name -> TState (MType, MType)
 inferBr (constr, params, body) = do

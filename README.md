@@ -16,7 +16,7 @@ A compiler for a statically typed, purely functional programming language with l
 - [x] Type inference
 - [x] Parametric polymorphism
 - [x] Let bindings
-- [ ] Lambda expressions
+- [x] Lambda expressions
 - [ ] Ad hoc polymorphism
 - [ ] Monadic IO
 - [ ] Bootstrapping

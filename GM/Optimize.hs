@@ -5,13 +5,20 @@ import GM.Compile
 import Utils.Function
 
 optGM :: CompiledCore -> CompiledCore
-optGM (constrs, fns) = (map optConstr constrs, map optFn fns)
+optGM (constrs, fns, lfns) =
+  (map optConstr constrs, map optFn fns, map optLiftedFn lfns)
 
 optConstr :: CompiledCoreConstr -> CompiledCoreConstr
-optConstr (name, arity, tag, code) = (name, arity, tag, (peephole . peephole) code)
+optConstr (name, arity, tag, code) = (name, arity, tag, optIns code)
 
 optFn :: CompiledCoreFn -> CompiledCoreFn
-optFn (name, arity, code) = (name, arity, (peephole . peephole) code)
+optFn (name, arity, code) = (name, arity, optIns code)
+
+optLiftedFn :: CompiledLiftedFn -> CompiledLiftedFn
+optLiftedFn (id, arity, code) = (id, arity, optIns code)
+
+optIns :: [Instruction] -> [Instruction]
+optIns = peephole . peephole
 
 peephole :: [Instruction] -> [Instruction]
 peephole code =
