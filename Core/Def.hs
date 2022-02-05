@@ -52,3 +52,23 @@ localVarsExcept eSet (LetRecCE bs e) =
     newESet = foldl sInsert eSet bindIds
 localVarsExcept eSet (LambdaCE ps e) =
   localVarsExcept (foldl sInsert eSet ps) e
+
+replaceLocal :: Ident -> CoreExpr -> CoreExpr -> CoreExpr
+replaceLocal id replE e = case e of
+  LVarCE id' | id == id' ->
+    replE
+  AppCE e1 e2 ->
+    AppCE (replace e1) (replace e2)
+  CaseCE e brs ->
+    CaseCE (replace e) (map replaceBr brs)
+  LetCE bind e ->
+    LetCE (replaceBind bind) (replace e)
+  LetRecCE binds e ->
+    LetRecCE (map replaceBind binds) (replace e)
+  LambdaCE params e ->
+    LambdaCE params (replace e)
+  _ -> e
+  where
+    replace = replaceLocal id replE
+    replaceBr (tag, binds, e) = (tag, binds, replace e)
+    replaceBind (id, e) = (id, replace e)

@@ -38,6 +38,16 @@ addLiftedFn arity code = State $
   \env -> let id = liftIndex env in
     (id, env { liftedFns = (id, arity, code) : liftedFns env, liftIndex = id + 1 })
 
+reserveLift :: CState Ident
+reserveLift = State $
+  \env -> let id = liftIndex env in
+    (id, env { liftIndex = id + 1 })
+
+assignLift :: Ident -> Int -> Code -> CState ()
+assignLift id arity code = State $
+  \env ->
+    ((), env { liftedFns = (id, arity, code) : liftedFns env })
+
 liftedApply :: Ident -> [Ident] -> CoreExpr
 liftedApply lId params =
   foldl AppCE (LiftedFn lId) (map LVarCE params)
@@ -80,16 +90,13 @@ compileWHNF st (LetCE (bindId, bindE) e) = do
   eCode <- compileWHNF (pushBinds st [bindId]) e
   return $ bCode ++ eCode ++ [Slide 1]
 compileWHNF st (LetRecCE binds e) = do
-  bCodes <- concat <$> traverse compLetR (zip bindEs [0..])
+  bCodes <- concat <$> traverse compLetR (zip binds [0..])
   eCode <- compileWHNF newStack e
   return $ Alloc n : bCodes ++ eCode ++ [Slide n]
   where
     n = length binds
-    (bindIds, bindEs) = unzip binds
-    newStack = pushBinds st bindIds
-    compLetR (bindE, offset) = do
-      code <- compileLazy newStack bindE
-      return $ code ++ [Update offset]
+    newStack = pushBinds st (map fst binds)
+    compLetR = compileLetRBind newStack
 compileWHNF st e = do
   code <- compileLazy st e
   return $ code ++ [Eval]
@@ -120,24 +127,35 @@ compileLazy st (LetCE (bindId, bindE) e) = do
   eCode <- compileLazy (pushBinds st [bindId]) e
   return $ bCode ++ eCode ++ [Slide 1]
 compileLazy st (LetRecCE binds e) = do
-  bCodes <- concat <$> traverse compLetR (zip bindEs [0..])
+  bCodes <- concat <$> traverse compLetR (zip binds [0..])
   eCode <- compileLazy newStack e
   return $ Alloc n : bCodes ++ eCode ++ [Slide n]
   where
     n = length binds
-    (bindIds, bindEs) = unzip binds
-    newStack = pushBinds st bindIds
-    compLetR (bindE, offset) = do
-      code <- compileLazy newStack bindE
-      return $ code ++ [Update offset]
+    newStack = pushBinds st (map fst binds)
+    compLetR = compileLetRBind newStack
 compileLazy st (LambdaCE params e) = do
-  (_, arity, code) <- compileFn (undefined, fullPs, e)
+  (_, arity, code) <- compileFn (undefined, localPs ++ params, e)
   liftedId <- addLiftedFn arity code
   let lamExpr = liftedApply liftedId localPs
   compileLazy st lamExpr
   where
     localPs = sToList $ localVarsExcept (sFromList params) e
-    fullPs = localPs ++ params
+
+compileLetRBind :: Stack -> (CoreBind, Int) -> CState Code
+-- special case: lambda in let rec
+compileLetRBind st ((bindId, LambdaCE params e), offset) = do
+  liftId <- reserveLift
+  let replaceExpr = liftedApply liftId localPs
+  let newE = replaceLocal bindId replaceExpr e
+  (_, arity, code) <- compileFn (undefined, localPs ++ params, newE)
+  assignLift liftId arity code
+  (++ [Update offset]) <$> compileLazy st replaceExpr
+  where
+    localPs = sToList $ localVarsExcept (sFromList (bindId : params)) e
+compileLetRBind st ((_, bindE), offset) = do
+  code <- compileLazy st bindE
+  return $ code ++ [Update offset]
 
 compileBranch :: Stack -> CoreBranch -> CState (Int, Code)
 compileBranch st (tag, binds, body) = do

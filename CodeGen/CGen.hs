@@ -130,7 +130,7 @@ genInstr Not =
 genInstr (Jump brs) =
   "switch (PEEK(node_ptr_t)->tag) {\n" ++
   concatMap genCase brs ++
-  "default: puts(\"Non-exhaustive pattern\"); exit_program();\n" ++
+  "default: fputs(\"Non-exhaustive pattern!\\n\", stderr); exit(1);\n" ++
   "};\n"
 
 genCase :: (Int, [Instruction]) -> CCode

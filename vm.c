@@ -13,21 +13,31 @@ typedef void (*func_t)(void);
 
 /** stack, heap **/
 
-#ifndef MEM_SIZE
-#define MEM_SIZE (1ULL << 24)
+#ifndef STACK_SIZE
+#define STACK_SIZE (1ULL << 20)
 #endif
-static byte_t memory[MEM_SIZE];
 
-static ptr_t bp = memory + MEM_SIZE;
-static ptr_t sp = memory + MEM_SIZE;
+#ifndef HEAP_SIZE
+#define HEAP_SIZE (1ULL << 24)
+#endif
+
+static byte_t stack[STACK_SIZE];
+static byte_t heap[HEAP_SIZE];
+
+static ptr_t bp = stack + STACK_SIZE;
+static ptr_t sp = stack + STACK_SIZE;
 // stack space: sp <= addr < bp
 
-static ptr_t brk = memory;
+static ptr_t brk = heap;
 // heap_space: memory <= addr < brk
 
 #define PUSH(type, val) \
 do { \
     sp -= sizeof(type); \
+    if (sp < (ptr_t)stack) { \
+        fputs("Stack overflow!\n", stderr); \
+        exit(1); \
+    } \
     *((type *)sp) = val; \
 } while (0)
 
@@ -40,11 +50,6 @@ do { \
 
 #define BOTTOM(type) (*((type *)(bp - sizeof(type))))
 
-void exit_program(void) {
-    fflush(stdout);
-    exit(0);
-}
-
 /** node **/
 
 #define NAPP    0
@@ -52,6 +57,7 @@ void exit_program(void) {
 #define NIND    2
 #define NDATA   3
 #define NINT    4
+#define NNULL   5
 
 #define FALSE 0
 #define TRUE  1
@@ -84,20 +90,21 @@ int_t gc_threshold = GC_INIT_THRESHOLD;
 int_t stat_gc_count = 0;
 void global_gc(void);
 
-// should call with proper value before each instruction
-void mem_reserve(int_t r_size) {
-    if ((ptr_t)brk - (ptr_t)memory >= gc_threshold ||
-        (ptr_t)sp - (ptr_t)brk < r_size) {
+node_ptr_t node_alloc(int_t d_arity) {
+    int_t alloc_size = NODE_SIZE(d_arity);
+
+    int_t heap_size = (ptr_t)brk - (ptr_t)heap;
+    if (heap_size >= gc_threshold ||
+        heap_size + alloc_size > HEAP_SIZE) {
         global_gc();
-        if ((ptr_t)sp - (ptr_t)brk < r_size) {
-            puts("Out of memory!");
+        heap_size = (ptr_t)brk - (ptr_t)heap;
+        if (heap_size + alloc_size > HEAP_SIZE) {
+            fputs("Out of memory!\n", stderr);
             exit(1);
         }
-        gc_threshold = 2 * ((ptr_t)brk - (ptr_t)memory);
+        gc_threshold = 2 * heap_size;
     }
-}
 
-node_ptr_t node_alloc(int_t alloc_size) {
     node_ptr_t new_node = (node_ptr_t)brk;
     brk += alloc_size;
 
@@ -173,7 +180,7 @@ void global_gc(void) {
             gc_mark(PEEK(node_ptr_t));
             POP(node_ptr_t);
         }
-        if (bp == memory + MEM_SIZE)
+        if (bp == stack + STACK_SIZE)
             break;
         else {
             bp = PEEK(ptr_t);
@@ -184,8 +191,8 @@ void global_gc(void) {
     bp = _bp;
 
     // 2: set forwarding
-    ptr_t new_position = (ptr_t)memory;
-    node_ptr_t p = (node_ptr_t)memory;
+    ptr_t new_position = (ptr_t)heap;
+    node_ptr_t p = (node_ptr_t)heap;
     while ((ptr_t)p < (ptr_t)brk) {
         int_t blk_size = p->gc_blksize;
         if (p->gc_reachable) {
@@ -207,7 +214,7 @@ void global_gc(void) {
             PEEK(node_ptr_t) = PEEK(node_ptr_t)->gc_forwarding;
             POP(node_ptr_t);
         }
-        if (bp == memory + MEM_SIZE)
+        if (bp == stack + STACK_SIZE)
             break;
         else {
             bp = PEEK(ptr_t);
@@ -217,7 +224,7 @@ void global_gc(void) {
     sp = _sp;
     bp = _bp;
 
-    p = (node_ptr_t)memory;
+    p = (node_ptr_t)heap;
     while ((ptr_t)p < (ptr_t)brk) {
         if (p->gc_reachable) {
             gc_update(p);
@@ -228,7 +235,7 @@ void global_gc(void) {
     // 4: move objects
 
     node_ptr_t new_p;
-    p = (node_ptr_t)memory;
+    p = (node_ptr_t)heap;
     while ((ptr_t)p < (ptr_t)brk) {
         int_t blk_size = p->gc_blksize;
         if (p->gc_reachable) {
@@ -246,29 +253,23 @@ void global_gc(void) {
 }
 
 void inst_pushg(int_t g_offset) {
-    mem_reserve(sizeof(node_ptr_t));
     PUSH(node_ptr_t, globals + g_offset);
 }
 
 void inst_pushi(int_t val) {
-    int_t h_alloc_size = NODE_SIZE(0);
-    mem_reserve(h_alloc_size + sizeof(node_ptr_t));
-    node_ptr_t p = node_alloc(h_alloc_size);
+    node_ptr_t p = node_alloc(0);
     p->type = NINT;
     p->intv = val;
     PUSH(node_ptr_t, p);
 }
 
 void inst_push(int_t offset) {
-    mem_reserve(sizeof(node_ptr_t));
     node_ptr_t p = PEEK_OFFSET(node_ptr_t, offset);
     PUSH(node_ptr_t, p);
 }
 
 void inst_mkapp(void) {
-    int_t h_alloc_size = NODE_SIZE(0);
-    mem_reserve(h_alloc_size);
-    node_ptr_t p = node_alloc(h_alloc_size);
+    node_ptr_t p = node_alloc(0);
     node_ptr_t p0 = PEEK_OFFSET(node_ptr_t, 0);
     node_ptr_t p1 = PEEK_OFFSET(node_ptr_t, 1);
     p->type = NAPP;
@@ -286,9 +287,7 @@ void inst_update(int_t offset) {
 }
 
 void inst_pack(int_t tag, int_t arity) {
-    int_t h_alloc_size = NODE_SIZE(arity);
-    mem_reserve(h_alloc_size + sizeof(node_ptr_t));
-    node_ptr_t p = node_alloc(h_alloc_size);
+    node_ptr_t p = node_alloc(arity);
     p->type = NDATA;
     p->tag = tag;
     p->d_arity = arity;
@@ -302,7 +301,6 @@ void inst_pack(int_t tag, int_t arity) {
 void inst_split(void) {
     node_ptr_t p = PEEK(node_ptr_t);
     int_t d_arity = p->d_arity;
-    mem_reserve(d_arity * sizeof(node_ptr_t));
     POP(node_ptr_t);
     for (int_t i = d_arity - 1; i >= 0; --i) {
         PUSH(node_ptr_t, p->d_params[i]);
@@ -315,7 +313,6 @@ void inst_slide(int_t n) {
 }
 
 void inst_eval(void) {
-    mem_reserve(sizeof(ptr_t));
     node_ptr_t p = PEEK(node_ptr_t);
     POP(node_ptr_t);
     PUSH(ptr_t, bp);
@@ -327,11 +324,10 @@ void inst_eval(void) {
         int_t arity;
         switch (p->type) {
         case NAPP:
-            mem_reserve(sizeof(node_ptr_t)); 
-            PUSH(node_ptr_t, p->left); 
+            PUSH(node_ptr_t, p->left);
             break;
-        case NIND: 
-            PEEK(node_ptr_t) = p->to; 
+        case NIND:
+            PEEK(node_ptr_t) = p->to;
             break;
         case NGLOBAL:
             arity = p->g_arity;
@@ -359,32 +355,27 @@ void inst_eval(void) {
     }
 }
 
-
 void inst_pop(int_t n) {
     POP_N(node_ptr_t, n);
 }
 
 void inst_alloc(int_t n) {
-    mem_reserve(n * (NODE_SIZE(0) + sizeof(node_ptr_t)));
     for (int_t i = 0; i < n; ++i) {
-        node_ptr_t p = node_alloc(NODE_SIZE(0));
-        p->type = NIND;
-        p->to = NULL;
+        node_ptr_t p = node_alloc(0);
+        p->type = NNULL;
         PUSH(node_ptr_t, p);
     }
 }
 
 #define INST_INT_ARITH_BINOP(op) \
     do { \
-    int_t h_alloc_size = NODE_SIZE(0); \
-    mem_reserve(h_alloc_size); \
-    node_ptr_t p = node_alloc(h_alloc_size); \
-    node_ptr_t p0 = PEEK_OFFSET(node_ptr_t, 0); \
-    node_ptr_t p1 = PEEK_OFFSET(node_ptr_t, 1); \
-    p->type = NINT; \
-    p->intv = (p0->intv) op (p1->intv); \
-    POP_N(node_ptr_t, 2); \
-    PUSH(node_ptr_t, p); \
+        node_ptr_t p = node_alloc(0); \
+        node_ptr_t p0 = PEEK_OFFSET(node_ptr_t, 0); \
+        node_ptr_t p1 = PEEK_OFFSET(node_ptr_t, 1); \
+        p->type = NINT; \
+        p->intv = (p0->intv) op (p1->intv); \
+        POP_N(node_ptr_t, 2); \
+        PUSH(node_ptr_t, p); \
     } while (0) \
 
 void inst_add(void) { INST_INT_ARITH_BINOP(+); }
@@ -395,16 +386,14 @@ void inst_rem(void) { INST_INT_ARITH_BINOP(%); }
 
 #define INST_INT_CMP_BINOP(op) \
     do { \
-    int_t h_alloc_size = NODE_SIZE(0); \
-    mem_reserve(h_alloc_size); \
-    node_ptr_t p = node_alloc(h_alloc_size); \
-    node_ptr_t p0 = PEEK_OFFSET(node_ptr_t, 0); \
-    node_ptr_t p1 = PEEK_OFFSET(node_ptr_t, 1); \
-    p->type = NDATA; \
-    p->tag = (p0->intv) op (p1->intv) ? 1 : 0; \
-    p->d_arity = 0; \
-    POP_N(node_ptr_t, 2); \
-    PUSH(node_ptr_t, p); \
+        node_ptr_t p = node_alloc(0); \
+        node_ptr_t p0 = PEEK_OFFSET(node_ptr_t, 0); \
+        node_ptr_t p1 = PEEK_OFFSET(node_ptr_t, 1); \
+        p->type = NDATA; \
+        p->tag = (p0->intv) op (p1->intv) ? 1 : 0; \
+        p->d_arity = 0; \
+        POP_N(node_ptr_t, 2); \
+        PUSH(node_ptr_t, p); \
     } while (0)
 
 void inst_iseq(void) { INST_INT_CMP_BINOP(==); }
@@ -415,9 +404,7 @@ void inst_isge(void) { INST_INT_CMP_BINOP(>=); }
 void inst_isle(void) { INST_INT_CMP_BINOP(<=); }
 
 void inst_not(void) {
-    int_t h_alloc_size = NODE_SIZE(0);
-    mem_reserve(h_alloc_size);
-    node_ptr_t p = node_alloc(h_alloc_size);
+    node_ptr_t p = node_alloc(0);
     node_ptr_t p0 = PEEK(node_ptr_t);
     p->type = NDATA;
     p->tag = (! p0->tag) ? 1 : 0;
@@ -461,5 +448,5 @@ int main(void) {
 
     print_stat();
 
-    exit_program();
+    return 0;
 }

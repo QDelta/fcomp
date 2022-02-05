@@ -1,6 +1,6 @@
 #!/bin/sh
 
-make
-build/fcomp examples/$1.src
-clang -O2 build/main.c -o build/main
+make && echo
+build/fcomp examples/$1.src &&
+clang -O2 build/main.c -o build/main &&
 echo $2 | build/main
