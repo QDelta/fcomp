@@ -2,7 +2,7 @@ ifte b x y = case b of { False -> y; True -> x };
 
 foldl f x l = case l of
   { Nil -> x
-  ; Cons h t -> f x (foldl f h t)
+  ; Cons h t -> foldl f (f x h) t
   };
 
 foldr f x l = case l of
@@ -40,16 +40,16 @@ fromTo m n =
   ifte (gt m n) Nil (Cons m (fromTo (add m 1) n));
 
 queens n = let
-  { loop = \boards counter ->
+  { loop boards counter =
       ifte
         (eq counter n)
         boards
         (loop (concatMap expand boards) (add counter 1))
-  ; expand = \board ->
+  ; expand board =
       map
         (\x -> Cons x board)
         (filter (\x -> safe x board 1) (fromTo 1 n))
-  ; safe = \x l n ->
+  ; safe x l n =
       case l of
       { Nil -> True
       ; Cons c y ->

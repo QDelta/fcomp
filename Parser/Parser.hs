@@ -134,11 +134,17 @@ pExprAtom =
   pparened pExpr
 
 pBind :: TParser (Bind RdrName)
-pBind = do
-  n <- pLName
-  psym Equal
-  e <- pExpr
-  return (n, e)
+pBind =
+  (do
+    n <- pLName
+    psym Equal
+    e <- pExpr
+    return (n, e)
+  ) <|>
+  (do
+    FnDef n ps b <- pFn
+    return (n, LambdaE ps b)
+  ) -- sugar
 
 pBranch :: TParser (Branch RdrName)
 pBranch = do

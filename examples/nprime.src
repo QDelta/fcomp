@@ -17,8 +17,8 @@ take n l = case l of
 
 primes =
   let
-  { from = \n -> Cons n (from (add 1 n))
-  ; sieve = \l ->
+  { from n = Cons n (from (add 1 n))
+  ; sieve l =
       case l of
       { Nil -> Nil
       ; Cons p rest ->

@@ -1,9 +1,9 @@
 {-# LANGUAGE TupleSections #-}
 
 module Utils.State
-  ( State(..),
-    execState,
-    evalState
+  ( State(..)
+  , execState
+  , evalState
   ) where
 
 import Utils.Function

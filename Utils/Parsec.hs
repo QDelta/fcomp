@@ -1,15 +1,15 @@
 {-# LANGUAGE LambdaCase #-}
 
 module Utils.Parsec
-  ( Parser(..),
-    (<|>),
-    pitem,
-    pseq,
-    psat,
-    psym,
-    pstar,
-    pplus,
-    pinterleave
+  ( Parser(..)
+  , (<|>)
+  , pitem
+  , pseq
+  , psat
+  , psym
+  , pstar
+  , pplus
+  , pinterleave
   ) where
 
 import Utils.Function
@@ -72,7 +72,7 @@ pplus p = do
   return (a : as)
 
 pinterleave :: Parser i a -> Parser i b -> Parser i [a]
-pinterleave pa pb = do
+pinterleave pa psep = do
   first <- pa
-  rest <- pstar (snd <$> pseq pb pa)
+  rest <- pstar (snd <$> pseq psep pa)
   return (first : rest)

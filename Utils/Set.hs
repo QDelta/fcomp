@@ -1,14 +1,14 @@
 module Utils.Set
-  ( Set,
-    emptySet,
-    sElem,
-    sInsert,
-    sRemove,
-    sToList,
-    sFromList,
-    sUnion,
-    sSingleton,
-    sIsEmpty
+  ( Set
+  , emptySet
+  , sElem
+  , sInsert
+  , sRemove
+  , sToList
+  , sFromList
+  , sUnion
+  , sSingleton
+  , sIsEmpty
   ) where
 
 import qualified Data.Set as Set

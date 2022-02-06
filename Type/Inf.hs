@@ -99,13 +99,14 @@ genDepGraph defs = map genDep defs
 
 infer :: Program Name -> String
 infer prog =
-  concatMap showData dataInfos ++ concatMap showFn fnInfos
+  (concat . interleave "\n") 
+    (map showData dataInfos ++ map showFn fnInfos)
   where
     (dataInfos, fnInfos) = evalState (inferProgram prog) initialTypeEnv
     showData (name, (arity, _)) =
-      name ++ " :: " ++ concat (replicate arity "* -> ") ++ "*\n"
+      name ++ " :: " ++ concat (replicate arity "* -> ") ++ "*"
     showFn (name, typ) =
-      name ++ " :: " ++ show typ ++ "\n"
+      name ++ " :: " ++ show typ
 
 inferProgram :: Program Name -> TState ([DataInfo], [FnInfo])
 inferProgram (dataDefs, fnDefs) = do

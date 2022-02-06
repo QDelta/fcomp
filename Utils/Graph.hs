@@ -1,4 +1,9 @@
-module Utils.Graph (Graph, SCC(..), strongCCs, flattenSCC) where
+module Utils.Graph 
+  ( Graph
+  , SCC(..)
+  , strongCCs
+  , flattenSCC
+  ) where
 
 import qualified Data.Graph as G
 

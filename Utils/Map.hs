@@ -1,15 +1,15 @@
 module Utils.Map
-  ( Map,
-    emptyMap,
-    mElem,
-    mLookup,
-    (!),
-    mInsert,
-    mUpdate,
-    mRemove,
-    mToList,
-    mFromList,
-    mSize
+  ( Map
+  , emptyMap
+  , mElem
+  , mLookup
+  , (!)
+  , mInsert
+  , mUpdate
+  , mRemove
+  , mToList
+  , mFromList
+  , mSize
   ) where
 
 import Utils.Function
