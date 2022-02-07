@@ -2,25 +2,20 @@
 
 A compiler for a statically typed, purely functional programming language with lazy evaluation.
 
-### Basics
-
-- [x] Parser
-- [x] Type checker
-- [x] Compile to G-machine code
-- [x] Compile to C
-- [x] Garbage collector
-
 ### Features
 
-- [x] Integer Primitives
+- [x] Algebraic data types
+- [x] Integer primitives
 - [x] Type inference
 - [x] Parametric polymorphism
 - [x] Let bindings
 - [x] Lambda expressions
 - [ ] Type classes
 - [ ] Higher kinded types
+- [ ] Monad, do notation
 - [ ] Monadic IO
 - [ ] Bootstrapping
+- [ ] Infix operators, indentation based parsing, ...
 
 ### Example
 
