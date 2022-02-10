@@ -67,24 +67,16 @@ compileWHNF _ (IntCE n) =
 compileWHNF st (CaseCE e brs) = do
   eCode <- compileWHNF st e
   brCodes <- traverse (compileBranch st) brs
-  return $ eCode ++ [Jump brCodes]
-compileWHNF st e@(AppCE (GVarCE op) opr) =
-  case mLookup (getIdent op) prim1 of
-    Just inst -> do
+  return $ eCode ++ [CaseJ brCodes]
+compileWHNF st e@(AppCE (GVarCE op) opr)
+  | getIdent op `mElem` prim1 = do
       code <- compileWHNF st opr
-      return $ code ++ [inst]
-    Nothing -> do
-      code <- compileLazy st e
-      return $ code ++ [Eval]
-compileWHNF st e@(AppCE (AppCE (GVarCE op) opr1) opr2) =
-  case mLookup (getIdent op) prim2 of
-    Just inst -> do
+      return $ code ++ [prim1 ! getIdent op]
+compileWHNF st e@(AppCE (AppCE (GVarCE op) opr1) opr2)
+  | getIdent op `mElem` prim2 = do
       code2 <- compileWHNF st opr2
       code1 <- compileWHNF (push st 1) opr1
-      return $ code2 ++ code1 ++ [inst]
-    Nothing -> do
-      code <- compileLazy st e
-      return $ code ++ [Eval]
+      return $ code2 ++ code1 ++ [prim2 ! getIdent op]
 compileWHNF st (LetCE (bindId, bindE) e) = do
   bCode <- compileLazy st bindE
   eCode <- compileWHNF (pushBinds st [bindId]) e

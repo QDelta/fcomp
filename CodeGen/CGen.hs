@@ -127,7 +127,7 @@ genInstr IsLe =
   "inst_isle();\n"
 genInstr Not =
   "inst_not();\n"
-genInstr (Jump brs) =
+genInstr (CaseJ brs) =
   "switch (PEEK(node_ptr_t)->tag) {\n" ++
   concatMap genCase brs ++
   "default: fputs(\"Non-exhaustive pattern!\\n\", stderr); exit(1);\n" ++

@@ -38,6 +38,6 @@ peephole code =
       peephole $ Slide n : Eval : rest
     Eval : Update n : Pop m : rest | n >= m ->
       peephole $ Slide m : Eval : Update (n - m) : rest
-    Jump brs : rest ->
-      [Jump $ map (second (peephole . (++ rest))) brs] -- merge rest instructions into branch
+    CaseJ brs : rest ->
+      [CaseJ $ map (second (peephole . (++ rest))) brs] -- merge rest instructions into branch
     ins : rest -> ins : peephole rest

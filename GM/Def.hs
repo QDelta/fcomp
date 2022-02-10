@@ -4,16 +4,16 @@ import Utils.Map
 import Common.Def
 
 data Instruction
-  = PushG  Name
-  | PushL  Ident
-  | PushI  Int
+  = PushG  Name  -- global
+  | PushL  Ident -- lifted
+  | PushI  Int   -- boxed int
   | Push   Int
   | Pop    Int
   | MkApp
   | Update Int
   | Pack   Int Int
   | Split
-  | Jump   [(Int, [Instruction])]
+  | CaseJ  [(Int, [Instruction])]
   | Slide  Int
   | Alloc  Int
   | Eval

@@ -44,8 +44,8 @@ compiledPrimFns :: [(Name, Int, Code)]
 compiledPrimFns =
   -- and x y = case x of { False -> False; True -> y };
   -- or x y = case x of { True -> True; False -> y };
-  [ (primNames ! "and", 2, [Push 0, Eval, Jump [(0, [Pop 1, Pack 0 0]), (1, [Pop 1, Push 1, Eval])], Update 2, Pop 2])
-  , (primNames ! "or",  2, [Push 0, Eval, Jump [(0, [Pop 1, Push 1, Eval]), (1, [Pop 1, Pack 1 0])], Update 2, Pop 2])
+  [ (primNames ! "and", 2, [Push 0, Eval, CaseJ [(0, [Pop 1, Pack 0 0]), (1, [Pop 1, Push 1, Eval])], Update 2, Pop 2])
+  , (primNames ! "or",  2, [Push 0, Eval, CaseJ [(0, [Pop 1, Push 1, Eval]), (1, [Pop 1, Pack 1 0])], Update 2, Pop 2])
   ]
   ++ map (compilePrimFn 2) prim2Insts
   ++ map (compilePrimFn 1) prim1Insts
