@@ -31,12 +31,17 @@ static ptr_t sp = stack + STACK_SIZE;
 static ptr_t brk = heap;
 // heap_space: memory <= addr < brk
 
+int_t stat_max_stack_size = 0;
+
 #define PUSH(type, val) \
 do { \
     sp -= sizeof(type); \
+    int_t stk_size = (ptr_t)(stack + STACK_SIZE) - sp; \
     if (sp < (ptr_t)stack) { \
         fputs("Stack overflow!\n", stderr); \
         exit(1); \
+    } else if (stk_size > stat_max_stack_size) {\
+        stat_max_stack_size = stk_size; \
     } \
     *((type *)sp) = val; \
 } while (0)
@@ -84,10 +89,11 @@ struct _node {
 
 #define NODE_SIZE(d_arity) (sizeof(node_t) + (d_arity) * sizeof(node_ptr_t))
 
-#define GC_INIT_THRESHOLD 2048
+#define GC_INIT_THRESHOLD 4096
 
 int_t gc_threshold = GC_INIT_THRESHOLD;
 int_t stat_gc_count = 0;
+int_t stat_max_heap_size = 0;
 void global_gc(void);
 
 node_ptr_t node_alloc(int_t d_arity) {
@@ -168,6 +174,11 @@ void global_init(void);
 
 // LISP2 GC algorithm
 void global_gc(void) {
+    int_t heap_size = brk - (ptr_t)heap;
+    if (heap_size > stat_max_heap_size) {
+        stat_max_heap_size = heap_size;
+    }
+
     // 1: mark
     for (int_t i = 0; i < global_num; ++i) {
         gc_mark_children(globals + i);
@@ -233,7 +244,6 @@ void global_gc(void) {
     }
 
     // 4: move objects
-
     node_ptr_t new_p;
     p = (node_ptr_t)heap;
     while ((ptr_t)p < (ptr_t)brk) {
@@ -425,6 +435,9 @@ void print_head(const char *format) {
 
 void print_stat() {
     printf("GC Count: %lld\n", stat_gc_count);
+    printf("GC Threshold: %lld bytes\n", gc_threshold);
+    printf("Maximum stack usage: %lld bytes\n", stat_max_stack_size);
+    printf("Maximum heap usage: %lld bytes\n", stat_max_heap_size);
 }
 
 int main(void) {
@@ -444,7 +457,7 @@ int main(void) {
     while (PEEK(node_ptr_t)->tag != 0) {
         print_head(",%ld");
     }
-    putchar('\n');
+    printf("\n\n");
 
     print_stat();
 
