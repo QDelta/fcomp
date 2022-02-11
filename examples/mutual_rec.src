@@ -1,7 +1,8 @@
 data Even = Z | OS Odd;
 data Odd = ES Even;
 
-toIntE n = case n of
+toIntE n =
+  case n of
   { Z -> 0
   ; OS m -> add 1 (toIntO m)
   };

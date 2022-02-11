@@ -1,9 +1,11 @@
-map f l = case l of
+map f l =
+  case l of
   { Nil -> Nil
   ; Cons h t -> Cons (f h) (map f t)
   };
 
-head l = case l of
+head l =
+  case l of
   { Nil -> 0
   ; Cons h t -> h
   };

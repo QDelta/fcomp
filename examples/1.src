@@ -1,4 +1,5 @@
-head l = case l of
+head l =
+  case l of
   { Nil -> 0
   ; Cons h t -> h
   };

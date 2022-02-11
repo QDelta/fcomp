@@ -1,12 +1,17 @@
-ifte b x y = case b of
+ifte b x y =
+  case b of
   { True  -> x
   ; False -> y
   };
 
-take n l = case l of
-  { Nil -> Nil
-  ; Cons h t -> ifte (eq 0 n) Nil (Cons h (take (sub n 1) t))
-  };
+take n l =
+  ifte
+    (le n 0)
+    Nil
+    (case l of
+      { Nil -> Nil
+      ; Cons h t -> take (sub n 1) t
+      });
 
 -- tying the knot
 start n =

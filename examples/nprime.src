@@ -1,16 +1,19 @@
-ifte b x y = case b of
+ifte b x y =
+  case b of
   { True  -> x
   ; False -> y
   };
 
-filter f l = case l of
+filter f l =
+  case l of
   { Nil -> Nil
   ; Cons h t ->
       let { rest = filter f t } in
         ifte (f h) (Cons h rest) rest
   };
 
-take n l = case l of
+take n l =
+  case l of
   { Nil -> Nil
   ; Cons h t -> ifte (eq 0 n) Nil (Cons h (take (sub n 1) t))
   };
