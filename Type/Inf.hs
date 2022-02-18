@@ -27,7 +27,7 @@ data TypeEnv = TypeEnv
   , ctmap :: CTMap -- global constructors
   , ltmap :: LTMap -- local variables
   , vtmap :: VTMap -- equations for type variables
-  , index :: Int   -- unique id generator
+  , index :: Int   -- typevar generator
   }
 
 initialTypeEnv :: TypeEnv

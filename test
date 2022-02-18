@@ -2,5 +2,5 @@
 
 make && echo
 build/fcomp examples/$1.src && echo
-clang -O2 build/main.c -o build/main &&
+gcc -O2 build/main.c -o build/main &&
 echo $2 | build/main
