@@ -32,8 +32,8 @@ M m ! k = m Map.! k
 mInsert :: Ord k => (k, v) -> Map k v -> Map k v
 mInsert (k, v) (M m) = M (Map.insert k v m)
 
-mUpdate :: Ord k => (v -> v) -> k -> Map k v -> Map k v
-mUpdate f k (M m) = M (Map.update (Just . f) k m)
+mUpdate :: Ord k => (v -> Maybe v) -> k -> Map k v -> Map k v
+mUpdate f k (M m) = M (Map.update f k m)
 
 mRemove :: Ord k => k -> Map k v -> Map k v
 mRemove k (M m) = M (Map.delete k m)

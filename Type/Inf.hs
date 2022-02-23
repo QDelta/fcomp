@@ -231,7 +231,6 @@ inferExpr (LetE binds e) = do
     bindIdents = map getIdent names
     identSet = sFromList bindIdents
     depList e = sToList $ depsOfExprIn identSet e
-
 inferExpr (LambdaE params e) = do
   ptypes <- newTypeVars (length params)
   traverse_ bindL (zip (map getIdent params) ptypes)
