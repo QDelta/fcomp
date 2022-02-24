@@ -1,0 +1,9 @@
+-- [n, 0]
+start n =
+  let
+  { s x y z = x z (y z)
+  ; k x y = x
+  ; i = s k k
+  ; b2i b = case b of { False -> 0; True -> 1 }
+  } in
+  Cons (i n) (Cons (b2i (i False)) Nil)

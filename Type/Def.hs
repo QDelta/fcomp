@@ -11,6 +11,7 @@ data MType
 data PType = Forall (Set Int) MType
 
 type DataAttr = (Int, Bool) -- number of type parameters, is number type
+-- data type with only constant constructors can be translate to integers
 
 instance Show MType where
   show t = case t of
