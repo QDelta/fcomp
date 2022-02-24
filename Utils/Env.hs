@@ -36,7 +36,7 @@ eLookup k (Env m) =
 (Env m) ! k = head (m M.! k)
 
 eBind :: Ord k => (k, v) -> Env k v -> Env k v
-eBind (k, v) (Env m) = Env $ M.mUpdate (Just . (v :)) k m
+eBind (k, v) (Env m) = Env $ M.mInsertWith (++) (k, [v]) m
 
 eRemove :: Ord k => k -> Env k v -> Env k v
 eRemove k (Env m) = Env $ M.mUpdate maybeTail k m

@@ -5,6 +5,7 @@ module Utils.Map
   , mLookup
   , (!)
   , mInsert
+  , mInsertWith
   , mUpdate
   , mRemove
   , mToList
@@ -31,6 +32,9 @@ M m ! k = m Map.! k
 
 mInsert :: Ord k => (k, v) -> Map k v -> Map k v
 mInsert (k, v) (M m) = M (Map.insert k v m)
+
+mInsertWith :: Ord k => (v -> v -> v) -> (k, v) -> Map k v -> Map k v
+mInsertWith f (k, v) (M m) = M (Map.insertWith f k v m)
 
 mUpdate :: Ord k => (v -> Maybe v) -> k -> Map k v -> Map k v
 mUpdate f k (M m) = M (Map.update f k m)
