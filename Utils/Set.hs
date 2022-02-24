@@ -41,10 +41,3 @@ sSingleton = S . Set.singleton
 
 sIsEmpty :: Set k -> Bool
 sIsEmpty (S s) = Set.null s
-
-instance Foldable Set where
-  foldl f x (S s) = foldl f x s
-  foldr f x (S s) = foldr f x s
-
-instance Show k => Show (Set k) where
-  show (S s) = show s

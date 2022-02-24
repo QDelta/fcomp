@@ -1,32 +1,31 @@
 module Parser.Renamer (rename) where
 
 import Utils.Function
-import Utils.Map
-import Utils.Set
+import Utils.Env
 import Utils.State
 import Common.Def
 import Common.AST
 import Prim.Name
 
-type RenameEnv = ([(RdrName, Name)], Ident) -- map, next ident
+type RenameEnv = (Env RdrName Name, Ident) -- env, next ident
 
 type RState a = State RenameEnv a
 
 primEnv :: RenameEnv
-primEnv = (mToList primNames, mSize primNames)
+primEnv = (eFromList primNames, succ maxPrimIdent)
 
 findName :: RdrName -> RState (Maybe Name)
 findName s = State $
-  \(m, id) -> (lookup s m, (m, id))
+  \(e, id) -> (eLookup s e, (e, id))
 
 bindName :: RdrName -> RState Name
 bindName s = State $
-  \(m, id) -> let name = Name (s, id) in
-    (name, ((s, name) : m, id + 1))
+  \(e, id) -> let name = Name (s, id) in
+    (name, (eBind (s, name) e, succ id))
 
-rmRecent :: Int -> RState ()
-rmRecent n = State $
-  \(m, id) -> ((), (drop n m, id))
+rmBind :: RdrName -> RState ()
+rmBind n = State $
+  \(e, id) -> ((), (eRemove n e, id))
 
 rename :: Program RdrName -> Program Name
 rename prog = evalState (renameProg prog) primEnv
@@ -67,7 +66,7 @@ renameFn (FnDef fName params body) =
       rFName <- assertJust <$> findName fName
       rParams <- traverse bindName params
       rBody <- renameExpr body
-      rmRecent (length params)
+      traverse_ rmBind params
       return $ FnDef rFName rParams rBody
 
 renameExpr :: Expr RdrName -> RState (Expr Name)
@@ -94,7 +93,7 @@ renameExpr (CaseE e brs) = do
           rCons <- findName cons
           rBindNames <- traverse bindName bindNames
           rBody <- renameExpr body
-          rmRecent (length bindNames)
+          traverse_ rmBind bindNames
           return (assertJust rCons, rBindNames, rBody)
 renameExpr (LetE binds e) =
   case checkUnique bindNames of
@@ -103,7 +102,7 @@ renameExpr (LetE binds e) =
       rBindNames <- traverse bindName bindNames
       rBindEs <- traverse renameExpr bindEs
       re <- renameExpr e
-      rmRecent (length bindNames)
+      traverse_ rmBind bindNames
       return $ LetE (zip rBindNames rBindEs) re
   where
     (bindNames, bindEs) = unzip binds
@@ -113,5 +112,5 @@ renameExpr (LambdaE params e) =
     Nothing -> do
       rParams <- traverse bindName params
       re <- renameExpr e
-      rmRecent (length params)
+      traverse_ rmBind params
       return $ LambdaE rParams re

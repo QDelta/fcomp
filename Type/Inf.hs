@@ -346,7 +346,7 @@ primFn :: FTMap
 primFn =
   foldl
     (\m (s, typ) ->
-      mInsert (getIdent (primNames ! s), typ) m)
+      mInsert (getIdent (primNameMap ! s), typ) m)
     emptyMap
     (mToList primFnTypes)
 
@@ -354,6 +354,6 @@ primConstr :: CTMap
 primConstr =
   foldl
     (\m (s, typ) ->
-      mInsert (getIdent (primNames ! s), typ) m)
+      mInsert (getIdent (primNameMap ! s), typ) m)
     emptyMap
     (mToList primConstrTypes)

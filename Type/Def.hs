@@ -26,4 +26,4 @@ instance Show PType where
     (if sIsEmpty ps then "" else tparamStr) ++ show t
     where
       tparamStr =
-        "forall" ++ concatMap (\p -> " t" ++ show p) ps ++ ". "
+        "forall" ++ concatMap (\p -> " t" ++ show p) (sToList ps) ++ ". "

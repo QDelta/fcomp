@@ -90,5 +90,8 @@ primConstrs :: [CoreConstr]
 primConstrs =
   map
     (\(s, arity, tag) ->
-      (primNames ! s, arity, tag))
+      (primNameMap ! s, arity, tag))
     primCoreConstrs
+
+primIdents :: Set Ident
+primIdents = sFromList (enumFromTo minPrimIdent maxPrimIdent)

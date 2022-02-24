@@ -200,7 +200,7 @@ prim1 :: Map Ident Instruction
 prim1 =
   foldl
   (\m (s, inst) ->
-    mInsert (getIdent (primNames ! s), inst) m)
+    mInsert (getIdent (primNameMap ! s), inst) m)
   emptyMap
   prim1Insts
 
@@ -208,6 +208,6 @@ prim2 :: Map Ident Instruction
 prim2 =
   foldl
   (\m (s, inst) ->
-    mInsert (getIdent (primNames ! s), inst) m)
+    mInsert (getIdent (primNameMap ! s), inst) m)
   emptyMap
   prim2Insts

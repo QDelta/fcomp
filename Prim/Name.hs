@@ -1,11 +1,10 @@
 module Prim.Name where
 
 import Common.Def
-import Utils.Set
 import Utils.Map
 
-primNames :: Map RdrName Name
-primNames = mFromList
+primNames :: [(RdrName, Name)]
+primNames =
   [ ("add",   Name ("add",   0 )),
     ("sub",   Name ("sub",   1 )),
     ("mul",   Name ("mul",   2 )),
@@ -26,5 +25,11 @@ primNames = mFromList
     ("Cons",  Name ("Cons",  17))
   ]
 
-primIdents :: Set Ident
-primIdents = sFromList [0..17]
+primNameMap :: Map RdrName Name
+primNameMap = mFromList primNames
+
+minPrimIdent :: Ident
+minPrimIdent = 0
+
+maxPrimIdent :: Ident
+maxPrimIdent = 17

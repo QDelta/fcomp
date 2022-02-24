@@ -46,6 +46,3 @@ mFromList l = M (Map.fromList l)
 
 mSize :: Ord k => Map k v -> Int
 mSize (M m) = Map.size m
-
-instance (Ord k, Show k, Show v) => Show (Map k v) where
-  show m = concat $ interleave "\n" (map show (mToList m))
