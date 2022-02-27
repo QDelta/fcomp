@@ -40,10 +40,6 @@ type TState a = State TypeEnv a
 typeError :: String -> TState a
 typeError = error
 
-clearInfer :: TState ()
-clearInfer = State $
-  \env -> ((), env { vtmap = emptyMap, index = 0 })
-
 getEnv :: (TypeEnv -> a) -> TState a
 getEnv f = State $
   \env -> (f env, env)
@@ -76,6 +72,9 @@ bindC  p = setC  (mInsert p)
 bindLP p = setLP (mInsert p)
 bindLM p = setLM (mInsert p)
 bindV  p = setV  (mInsert p)
+
+rmLP k = setLP (mRemove k)
+rmLM k = setLM (mRemove k)
 
 newTypeVar :: TState MType
 newTypeVar = State $
@@ -167,7 +166,7 @@ inferGroup group = do
   let fnIdents = map getIdent names
   mtypes <- traverse (getLM . \n -> (! n)) fnIdents
   ptypes <- traverse generalize mtypes
-  traverse_ (setLM . mRemove) fnIdents
+  traverse_ rmLM fnIdents
   return $ zip names ptypes
 
 inferGroupM :: [FnDef Name] -> TState ()
@@ -186,11 +185,11 @@ inferFn :: FnDef Name -> TState ()
 inferFn (FnDef name params body) = do
   fType <- getLM (! getIdent name)
   let paramIdents = map getIdent params
-  let (binds, retType) = paramBind paramIdents fType
-  traverse_ bindLM binds
+  let (paramTypes, retType) = paramBind paramIdents fType
+  traverse_ bindLM (zip paramIdents paramTypes)
   bType <- inferExpr body
   unify retType bType
-  traverse_ (setLM . mRemove) paramIdents
+  traverse_ rmLM paramIdents
 
 inferExpr :: Expr Name -> TState MType
 inferExpr (IntE _) = return mIntT
@@ -232,7 +231,7 @@ inferExpr (LetE binds e) = do
   let bindFnGrps = depGroupSort bindFns
   bindFnIdents <- concat <$> traverse inferGrpBind bindFnGrps
   eType <- inferExpr e
-  traverse_ (setLP . mRemove) bindFnIdents
+  traverse_ rmLM bindFnIdents
   return eType
   where
     inferGrpBind grp = do
@@ -255,20 +254,20 @@ inferBr (constr, params, body) = do
     Nothing -> typeError $ "undefined constructor " ++ getName constr
   cType <- instantiate cTypeP
   let paramIdents = map getIdent params
-  let (binds, patType) = paramBind paramIdents cType
-  traverse_ bindLM binds
+  let (paramTypes, patType) = paramBind paramIdents cType
+  traverse_ bindLM (zip paramIdents paramTypes)
   bType <- inferExpr body
-  traverse_ (setLM . mRemove) paramIdents
+  traverse_ rmLM paramIdents
   return (assertDataT patType, bType)
   where
     assertDataT t@(DataT _ _) = t
     assertDataT _ = error "pattern with non-data type"
 
--- params -> function type -> (binds, return type)
-paramBind :: [Ident] -> MType -> ([(Ident, MType)], MType)
+-- params -> function type -> (param types, return type)
+paramBind :: [Ident] -> MType -> ([MType], MType)
 paramBind [] t = ([], t)
-paramBind (n : ns) (ArrT t1 t2) = ((n, t1) : restBind, ret)
-  where (restBind, ret) = paramBind ns t2
+paramBind (_ : ns) (ArrT t1 t2) = (t1 : rest, ret)
+  where (rest, ret) = paramBind ns t2
 paramBind _ _ = error ""
 
 deepResolve :: MType -> TState MType
