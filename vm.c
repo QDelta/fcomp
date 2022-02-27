@@ -100,15 +100,24 @@ node_ptr_t node_alloc(int_t d_arity) {
     int_t alloc_size = NODE_SIZE(d_arity);
 
     int_t heap_size = (ptr_t)brk - (ptr_t)heap;
-    if (heap_size >= gc_threshold ||
-        heap_size + alloc_size > HEAP_SIZE) {
+    int_t new_heap_size = heap_size + alloc_size;
+    if (heap_size >= gc_threshold
+     || new_heap_size > HEAP_SIZE) {
+
         global_gc();
+
         heap_size = (ptr_t)brk - (ptr_t)heap;
-        if (heap_size + alloc_size > HEAP_SIZE) {
+        new_heap_size = heap_size + alloc_size;
+        if (new_heap_size > HEAP_SIZE) {
             fputs("Out of memory!\n", stderr);
             exit(1);
         }
+
         gc_threshold = 2 * heap_size;
+    }
+
+    if (new_heap_size > stat_max_heap_size) {
+        stat_max_heap_size = new_heap_size;
     }
 
     node_ptr_t new_node = (node_ptr_t)brk;
@@ -174,11 +183,6 @@ void global_init(void);
 
 // LISP2 GC algorithm
 void global_gc(void) {
-    int_t heap_size = brk - (ptr_t)heap;
-    if (heap_size > stat_max_heap_size) {
-        stat_max_heap_size = heap_size;
-    }
-
     // 1: mark
     for (int_t i = 0; i < global_num; ++i) {
         gc_mark_children(globals + i);
