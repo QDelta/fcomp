@@ -435,7 +435,7 @@ void print_head(const char *format) {
 
 void print_stat() {
     printf("GC Count: %lld\n", stat_gc_count);
-    printf("GC Threshold: %lld bytes\n", gc_threshold);
+    printf("GC Threshold now: %lld bytes\n", gc_threshold);
     printf("Maximum stack usage: %lld bytes\n", stat_max_stack_size);
     printf("Maximum heap usage: %lld bytes\n", stat_max_heap_size);
 }

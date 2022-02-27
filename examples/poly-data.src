@@ -29,13 +29,10 @@ map f l =
   };
 
 take n l =
-  ifte
-    (le n 0)
-    Nil
-    (case l of
-      { Nil -> Nil
-      ; Cons h t -> take (sub n 1) t
-      });
+  case l of
+  { Nil -> Nil
+  ; Cons h t -> ifte (eq 0 n) Nil (Cons h (take (sub n 1) t))
+  };
 
 nats = Cons 0 (map (add 1) nats);
 

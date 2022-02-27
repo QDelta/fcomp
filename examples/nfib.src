@@ -5,13 +5,10 @@ ifte b x y =
   };
 
 take n l =
-  ifte
-    (le n 0)
-    Nil
-    (case l of
-      { Nil -> Nil
-      ; Cons h t -> take (sub n 1) t
-      });
+  case l of
+  { Nil -> Nil
+  ; Cons h t -> ifte (eq 0 n) Nil (Cons h (take (sub n 1) t))
+  };
 
 zipWith f l1 l2 =
   case l1 of
