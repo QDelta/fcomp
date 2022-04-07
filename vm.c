@@ -1,6 +1,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 extern void exit(int);
 
@@ -94,6 +95,7 @@ struct _node {
 int_t gc_threshold = GC_INIT_THRESHOLD;
 int_t stat_gc_count = 0;
 int_t stat_max_heap_size = 0;
+clock_t stat_gc_clock = 0;
 void global_gc(void);
 
 node_ptr_t node_alloc(int_t d_arity) {
@@ -183,6 +185,8 @@ void global_init(void);
 
 // LISP2 GC algorithm
 void global_gc(void) {
+    clock_t stat_gc_start_clock = clock();
+
     // 1: mark
     for (int_t i = 0; i < global_num; ++i) {
         gc_mark_children(globals + i);
@@ -264,6 +268,8 @@ void global_gc(void) {
     brk = OFFSET(new_p, new_p->gc_blksize);
 
     stat_gc_count += 1;
+    clock_t stat_gc_end_clock = clock();
+    stat_gc_clock += stat_gc_end_clock - stat_gc_start_clock;
 }
 
 void inst_pushg(int_t g_offset) {
@@ -438,13 +444,16 @@ void print_head(const char *format) {
 }
 
 void print_stat() {
-    printf("GC Count: %lld\n", stat_gc_count);
-    printf("GC Threshold now: %lld bytes\n", gc_threshold);
+    printf("GC count: %lld\n", stat_gc_count);
+    printf("GC threshold now: %lld bytes\n", gc_threshold);
+    printf("GC time: %.2f ms\n", 1000.0 * stat_gc_clock / CLOCKS_PER_SEC);
     printf("Maximum stack usage: %lld bytes\n", stat_max_stack_size);
     printf("Maximum heap usage: %lld bytes\n", stat_max_heap_size);
 }
 
 int main(void) {
+    clock_t prog_start_clock = clock();
+
     global_init();
 
     int_t input;
@@ -463,6 +472,8 @@ int main(void) {
     }
     printf("\n\n");
 
+    clock_t prog_end_clock = clock();
+    printf("Execution time: %.2f ms\n", 1000.0 * (prog_end_clock - prog_start_clock) / CLOCKS_PER_SEC);
     print_stat();
 
     return 0;
