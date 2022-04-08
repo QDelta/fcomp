@@ -7,7 +7,7 @@ A compiler for a statically typed, purely functional programming language with l
 - [x] Algebraic data types
 - [x] Integer primitives
 - [x] Type inference
-- [x] Parametric polymorphism
+- [x] Parametric polymorphism (for global definitions)
 - [x] Let bindings
 - [x] Lambda expressions
 - [ ] Type classes

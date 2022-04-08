@@ -15,9 +15,9 @@ type DataAttr = (Int, Bool) -- number of type parameters, is number type
 
 instance Show MType where
   show t = case t of
-    VarT n -> 't' : show n
+    VarT n     -> 't' : show n
     DataT n ts -> n ++ concatMap (\t -> ' ' : showP t) ts
-    ArrT l r -> showP l ++ " -> " ++ show r
+    ArrT l r   -> showP l ++ " -> " ++ show r
     where
       showP t@(ArrT _ _) = '(' : show t ++ ")"
       showP t = show t
