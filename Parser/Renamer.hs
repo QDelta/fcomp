@@ -55,8 +55,11 @@ renameProg (dataDefs, fnDefs) =
 
 renameData :: DataDef RdrName -> RState (DataDef Name)
 renameData (DataDef name tps constrs) = do
-  rConstrs <- traverse renameConstr constrs
-  return $ DataDef name tps rConstrs
+  case checkUnique tps of
+    Just tp -> error $ "duplicate type parameter " ++ tp
+    Nothing -> do
+      rConstrs <- traverse renameConstr constrs
+      return $ DataDef name tps rConstrs
   where
     renameConstr (name, tSigs) = do
       rName <- findName name
@@ -65,7 +68,7 @@ renameData (DataDef name tps constrs) = do
 renameFn :: FnDef RdrName -> RState (FnDef Name)
 renameFn (FnDef fName params body) =
   case checkUnique params of
-    Just s -> error $ "duplicate parameter" ++ s
+    Just s -> error $ "duplicate parameter " ++ s
     Nothing -> do
       rFName <- findName fName
       rParams <- traverse bindName params
@@ -92,7 +95,7 @@ renameExpr (CaseE e brs) = do
   where
     renameBr (cons, bindNames, body) =
       case checkUnique bindNames of
-        Just s -> error $ "duplicate bind" ++ s
+        Just s -> error $ "duplicate case bind " ++ s
         Nothing -> do
           rCons <- findName cons
           rBindNames <- traverse bindName bindNames
@@ -101,7 +104,7 @@ renameExpr (CaseE e brs) = do
           return (rCons, rBindNames, rBody)
 renameExpr (LetE binds e) =
   case checkUnique bindNames of
-    Just s -> error $ "duplicate bind" ++ s
+    Just s -> error $ "duplicate let bind " ++ s
     Nothing -> do
       rBindNames <- traverse bindName bindNames
       rBindEs <- traverse renameExpr bindEs
@@ -112,7 +115,7 @@ renameExpr (LetE binds e) =
     (bindNames, bindEs) = unzip binds
 renameExpr (LambdaE params e) =
   case checkUnique params of
-    Just s -> error $ "duplicate parameter" ++ s
+    Just s -> error $ "duplicate lambda parameter " ++ s
     Nothing -> do
       rParams <- traverse bindName params
       re <- renameExpr e

@@ -154,35 +154,36 @@ inferData (DataDef name tpNames constrs) = do
 
 inferGroup :: [FnDef Name] -> TState [FnInfo]
 inferGroup group = do
-  inferGroupM group
+  (idents, mtypes) <- unzip <$> inferGroupM group
   let names = map (\(FnDef name _ _) -> name) group
-  let fnIdents = map getIdent names
-  mtypes <- traverse (getL . \n -> (! n)) fnIdents
   ptypes <- traverse generalize mtypes
-  traverse_ removeL fnIdents
+  traverse_ removeL idents
   return $ zip names ptypes
 
-inferGroupM :: [FnDef Name] -> TState ()
+inferGroupM :: [FnDef Name] -> TState [(Ident, MType)]
 inferGroupM group = do
   traverse_ constrFn group
-  traverse_ inferFn group
+  traverse inferFn group
 
 constrFn :: FnDef Name -> TState ()
 constrFn (FnDef name params _) = do
+  let ident = getIdent name
   ptypes <- newTypeVars (length params)
   retType <- newTypeVar
   let fType = foldr ArrT retType ptypes
-  bindL (getIdent name, fType)
+  bindL (ident, fType)
 
-inferFn :: FnDef Name -> TState ()
+inferFn :: FnDef Name -> TState (Ident, MType)
 inferFn (FnDef name params body) = do
-  fType <- getL (! getIdent name)
+  let ident = getIdent name
+  fType <- getL (! ident)
   let paramIdents = map getIdent params
   let (paramTypes, retType) = paramBind paramIdents fType
   traverse_ bindL (zip paramIdents paramTypes)
   bType <- inferExpr body
   unify retType bType
   traverse_ removeL paramIdents
+  return (ident, fType)
 
 inferExpr :: Expr Name -> TState MType
 inferExpr (IntE _) = return mIntT
@@ -218,17 +219,11 @@ inferExpr (CaseE expr brs) = do
 inferExpr (LetE binds e) = do
   let bindFns = map (\(name, expr) -> FnDef name [] expr) binds
   let bindFnGrps = depGroupSort bindFns
-  bindFnIdents <- concat <$> traverse inferGrpBind bindFnGrps
+  (bindFnIdents, _) <-
+    unzip . concat <$> traverse inferGroupM bindFnGrps
   eType <- inferExpr e
   traverse_ removeL bindFnIdents
   return eType
-  where
-    inferGrpBind grp = do
-      fnInfos <- inferGroup grp
-      let (fnNames, fnTypes) = unzip fnInfos
-      let fnIdents = map getIdent fnNames
-      traverse_ bindL $ zip fnIdents (map (\(Forall _ t) -> t) fnTypes)
-      return fnIdents
 inferExpr (LambdaE params e) = do
   ptypes <- newTypeVars (length params)
   traverse_ bindL (zip (map getIdent params) ptypes)
@@ -328,8 +323,6 @@ unifyError :: (Show a, Show b) => a -> b -> TState x
 unifyError t1 t2 =
   typeError $ "can not unify " ++ show t1 ++ " with " ++ show t2
 
--- ensure that `generalize m = Forall _ m`
--- typing of LetE depends on that
 generalize :: MType -> TState PType
 generalize t = do
   rt <- deepResolve t
