@@ -1,4 +1,4 @@
-module Utils.Graph 
+module Utils.Graph
   ( Graph
   , SCC(..)
   , strongCCs

@@ -90,7 +90,7 @@ genDepGraph defs = map genDep defs
 
 infer :: Program Name -> String
 infer prog =
-  (concat . interleave "\n") 
+  (concat . interleave "\n")
     (map showData dataInfos ++ map showFn fnInfos)
   where
     (dataInfos, fnInfos) = evalState (inferProgram prog) initialTypeEnv
@@ -219,8 +219,8 @@ inferExpr (CaseE expr brs) = do
 inferExpr (LetE binds e) = do
   let bindFns = map (\(name, expr) -> FnDef name [] expr) binds
   let bindFnGrps = depGroupSort bindFns
-  (bindFnIdents, _) <-
-    unzip . concat <$> traverse inferGroupM bindFnGrps
+  bindFnIdents <-
+    map fst . concat <$> traverse inferGroupM bindFnGrps
   eType <- inferExpr e
   traverse_ removeL bindFnIdents
   return eType
