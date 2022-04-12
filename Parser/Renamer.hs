@@ -142,7 +142,7 @@ renameExpr (CaseE e brs) =
     brConstrs = map fst3 brs
     renameBr (cons, bindNames, body) =
       case checkUnique bindNames of
-        Just s -> error $ "duplicate rec bind " ++ s
+        Just s -> error $ "duplicate case bind " ++ s
         Nothing -> do
           rCons <- findName cons
           rBindNames <- traverse bindName bindNames
@@ -157,7 +157,7 @@ renameExpr (LetE (name, bindE) e) = do
   return $ LetE (rBindName, rBindE) re
 renameExpr (LetRecE binds e) =
   case checkUnique bindNames of
-    Just s -> error $ "duplicate case bind " ++ s
+    Just s -> error $ "duplicate rec bind " ++ s
     Nothing -> do
       rBindNames <- traverse bindName bindNames
       rBindEs <- traverse renameExpr bindEs
