@@ -8,9 +8,10 @@ import Common.AST
 
 data Token
   = LParen | RParen
-  | LBrace | RBrace
-  | DataKW | CaseKW | OfKW  | LetKW | InKW
-  | Arrow  | SemiC  | Equal | Or    | BSlash
+  | DataKW | MatchKW | WithKW
+  | ValKW | RecKW
+  | LetKW | InKW
+  | Arrow | Equal | Or | BSlash
   | LineComment
   | UNameTok String
   | LNameTok String
@@ -44,33 +45,46 @@ pparened p = do
   psym RParen
   return a
 
-pbraced :: TParser a -> TParser a
-pbraced p = do
-  psym LBrace
-  a <- p
-  psym RBrace
-  return a
+pProgram :: TParser (Program RdrName)
+pProgram = do
+  datas <- pstar pDataGroup
+  groups <- pplus pGroup
+  return (datas, groups)
 
-pSemiC :: TParser Token
-pSemiC = psym SemiC
-
-type Definition = Either (DataDef RdrName) (FnDef RdrName)
-type PreProgram = [Definition]
-
-pProgram :: TParser PreProgram
-pProgram = pinterleave pDef pSemiC
-
-pDef :: TParser Definition
-pDef = (Left <$> pData) <|> (Right <$> pFn)
-
-pData :: TParser (DataDef RdrName)
-pData = do
+pDataGroup :: TParser (DataGroup RdrName)
+pDataGroup = do
   psym DataKW
+  binds <- pinterleave pData (psym WithKW)
+  return (RecData binds)
+
+pData :: TParser (DataBind RdrName)
+pData = do
   n <- pUName
   params <- pstar pLName
   psym Equal
   cs <- pinterleave pConstructor (psym Or)
-  return (DataDef n params cs)
+  return (n, params, cs)
+
+pGroup :: TParser (ValGroup RdrName)
+pGroup =
+  (do
+    psym ValKW
+    ValDef <$> pBind
+  ) <|>
+  (do
+    psym RecKW
+    psym ValKW
+    vals <- pinterleave pBind (psym WithKW)
+    return (RecVal vals)
+  )
+
+pBind :: TParser (Bind RdrName)
+pBind = do
+  n <- pLName
+  ps <- pstar pLName
+  psym Equal
+  b <- pExpr
+  return (n, LambdaE ps b)
 
 pConstructor :: TParser (Constructor RdrName)
 pConstructor = do
@@ -94,27 +108,27 @@ pTSTerm =
 pTSAtom :: TParser TypeSig
 pTSAtom = (VarTS <$> pLName) <|> pparened pTypeSig
 
-pFn :: TParser (FnDef RdrName)
-pFn = do
-  name <- pLName
-  params <- pstar pLName
-  psym Equal
-  FnDef name params <$> pExpr
-
 pExpr :: TParser (Expr RdrName)
 pExpr =
   (do
-    psym CaseKW
+    psym MatchKW
     e <- pExpr
-    psym OfKW
-    brs <- pbraced $ pinterleave pBranch pSemiC
+    psym WithKW
+    brs <- pplus pBranch
     return (CaseE e brs)
   ) <|>
   (do
     psym LetKW
-    binds <- pbraced $ pinterleave pBind pSemiC
+    bind <- pBind
     psym InKW
-    LetE binds <$> pExpr
+    LetE bind <$> pExpr
+  ) <|>
+  (do
+    psym LetKW
+    psym RecKW
+    binds <- pinterleave pBind (psym WithKW)
+    psym InKW
+    LetRecE binds <$> pExpr
   ) <|>
   (do
     psym BSlash
@@ -133,21 +147,9 @@ pExprAtom =
   VarE <$> pName <|>
   pparened pExpr
 
-pBind :: TParser (Bind RdrName)
-pBind =
-  (do
-    n <- pLName
-    psym Equal
-    e <- pExpr
-    return (n, e)
-  ) <|>
-  (do
-    FnDef n ps b <- pFn
-    return (n, LambdaE ps b)
-  ) -- sugar
-
 pBranch :: TParser (Branch RdrName)
 pBranch = do
+  psym Or
   constr <- pUName
   binds <- pstar pLName
   psym Arrow

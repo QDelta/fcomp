@@ -1,19 +1,18 @@
-ifte b x y =
-  case b of
-  { True  -> x
-  ; False -> y
-  };
+fn ifte b x y =
+  match b with
+  | True  -> x
+  | False -> y
 
-take n l =
-  case l of
-  { Nil -> Nil
-  ; Cons h t -> ifte (eq 0 n) Nil (Cons h (take (sub n 1) t))
-  };
+rec fn take n l =
+  match l with
+  | Nil -> Nil
+  | Cons h t -> ifte (eq 0 n) Nil (Cons h (take (sub n 1) t))
 
 -- tying the knot
-start n =
-  let
-  { x = Cons 1 y
-  ; y = Cons 2 x
-  } in
-  take n x
+fn start n =
+  let rec
+    x = Cons 1 y
+  with
+    y = Cons 2 x
+  in
+    take n x

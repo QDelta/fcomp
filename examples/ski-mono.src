@@ -1,6 +1,0 @@
-s x y z = x z (y z);
-k1 x y = x;
-k2 x y = x;
-i = s k1 k2;
-
-start n = Cons (i n) Nil

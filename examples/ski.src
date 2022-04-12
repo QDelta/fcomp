@@ -1,5 +1,5 @@
-s x y z = x z (y z);
-k x y = x;
-i = s k k;
+fn s x y z = x z (y z)
+fn k x y = x
+fn i = s k k
 
-start n = Cons (i n) Nil
+fn start n = Cons (i n) Nil

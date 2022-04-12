@@ -17,10 +17,9 @@ tlex s = case s of
       where
         (tok, rest) = lexer s
         toks =
-          if tok == LineComment then
-            tlex (skipLine rest)
-          else
-            tok : tlex rest
+          if tok == LineComment
+          then tlex (skipLine rest)
+          else tok : tlex rest
     skipLine :: String -> String
     skipLine [] = []
     skipLine (c : s)
@@ -54,12 +53,15 @@ nameLex f s = (tn, rest)
     isNameC c = isAlpha c || isDigit c
     (name, rest) = span isNameC s
     tn = case name of
-      "data" -> DataKW
-      "case" -> CaseKW
-      "of"   -> OfKW
-      "let"  -> LetKW
-      "in"   -> InKW
-      _      -> f name
+      "data"  -> DataKW
+      "match" -> MatchKW
+      "with"  -> WithKW
+      "val"   -> ValKW
+      "fn"    -> ValKW
+      "rec"   -> RecKW
+      "let"   -> LetKW
+      "in"    -> InKW
+      _       -> f name
 
 symLex :: String -> (Token, String)
 symLex s = symLexFrom s symbols
@@ -81,11 +83,8 @@ symbols :: [(String, Token)]
 symbols =
   [ ("(",  LParen),
     (")",  RParen),
-    ("{",  LBrace),
-    ("}",  RBrace),
     ("->", Arrow ),
     ("|",  Or    ),
-    (";",  SemiC ),
     ("=",  Equal ),
     ("\\", BSlash),
     ("--", LineComment)

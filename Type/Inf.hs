@@ -3,7 +3,6 @@ module Type.Inf (infer) where
 import Utils.Function
 import Utils.Map
 import Utils.Set
-import Utils.Graph
 import Utils.State
 import Common.Def
 import Common.AST
@@ -12,7 +11,7 @@ import Prim.Name
 import Prim.Type
 
 type DataInfo = (String, DataAttr)
-type FnInfo = (Name, PType)
+type ValInfo = (Name, PType)
 
 data TypeEnv = TypeEnv
   { dtmap :: Map String DataAttr  -- global data types
@@ -77,121 +76,125 @@ newTypeVar = State $
 newTypeVars :: Int -> TState [MType]
 newTypeVars n = traverse (const newTypeVar) (replicate n ())
 
-depGroupSort :: [FnDef Name] -> [[FnDef Name]]
-depGroupSort defs = map flattenSCC $ strongCCs (genDepGraph defs)
-
--- (f1, f2) in E : f1 (directly) calls f2
-genDepGraph :: [FnDef Name] -> Graph Ident (FnDef Name)
-genDepGraph defs = map genDep defs
-  where
-    fnIds = sFromList $ map (\(FnDef n _ _) -> getIdent n) defs
-    genDep def@(FnDef name params body) =
-      (def, getIdent name, sToList $ depsOfExprIn fnIds body)
-
 infer :: Program Name -> String
 infer prog =
   (concat . interleave "\n")
-    (map showData dataInfos ++ map showFn fnInfos)
+    (map showData dataInfos ++ map showVal valInfos)
   where
-    (dataInfos, fnInfos) = evalState (inferProgram prog) initialTypeEnv
+    (dataInfos, valInfos) = evalState (inferProgram prog) initialTypeEnv
     showData (name, (arity, _)) =
       name ++ " :: " ++ concat (replicate arity "* -> ") ++ "*"
-    showFn (name, typ) =
-      getName name ++ " :: " ++ show typ
+    showVal (name, t) =
+      getName name ++ " :: " ++ show t
 
-inferProgram :: Program Name -> TState ([DataInfo], [FnInfo])
-inferProgram (dataDefs, fnDefs) = do
-  dataInfos <- traverse constructData dataDefs
-  traverse_ inferData dataDefs
-  let fnGrps = depGroupSort fnDefs
-  fnInfos <- concat <$> traverse inferGrpBind fnGrps
-  return (dataInfos, fnInfos)
+inferProgram :: Program Name -> TState ([DataInfo], [ValInfo])
+inferProgram (dataGrps, groups) = do
+  -- dataInfos <- traverse constructData dataDefs
+  dataInfoLs <- traverse inferDataGroup dataGrps
+  valInfoLs <- traverse inferGroup groups
+  return (concat dataInfoLs, concat valInfoLs)
+
+inferDataGroup :: DataGroup Name -> TState [DataInfo]
+inferDataGroup (RecData binds) = do
+  dataInfos <- traverse addData binds
+  traverse_ inferData binds
+  return dataInfos
   where
-    inferGrpBind grp = do
-      fnInfos <- inferGroup grp
-      let (fnNames, fnTypes) = unzip fnInfos
-      traverse_ bindF $ zip (map getIdent fnNames) fnTypes
-      return fnInfos
+    addData :: DataBind Name -> TState DataInfo
+    addData (name, tpNames, constrs) = do
+      bindD (name, attr)
+      return (name, attr)
+      where
+        attr = (length tpNames, all (null . snd) constrs)
 
-constructData :: DataDef Name -> TState DataInfo
-constructData (DataDef name tparams constrs) = do
-  bindD (name, attr)
-  return (name, attr)
-  where
-    attr = (length tparams, all (null . snd) constrs)
+    inferData :: DataBind Name -> TState ()
+    inferData (name, tpNames, constrs) =
+      traverse_ inferConstr constrs
+      where
+        tparams = take (length tpNames) [0..]
+        tpMap = mFromList (zip tpNames tparams)
+        dType = DataT name (map VarT tparams)
 
-inferData :: DataDef Name -> TState ()
-inferData (DataDef name tpNames constrs) = do
-  traverse_ inferConstr constrs
-  where
-    tparams = take (length tpNames) [0..]
-    tpMap = mFromList (zip tpNames tparams)
-    dType = DataT name (map VarT tparams)
+        inferConstr :: Constructor Name -> TState ()
+        inferConstr (name, tss) = do
+          types <- traverse tsToType tss
+          let cType = Forall (sFromList tparams) (foldr ArrT dType types)
+          bindC (getIdent name, cType)
 
-    inferConstr :: Constructor Name -> TState ()
-    inferConstr (name, tss) = do
-      types <- traverse tsToType tss
-      let cType = Forall (sFromList tparams) (foldr ArrT dType types)
-      bindC (getIdent name, cType)
+        tsToType :: TypeSig -> TState MType
+        tsToType (VarTS name) =
+          case mLookup name tpMap of
+            Just p -> return $ VarT p
+            Nothing -> typeError $ "undefined type parameter " ++ name
+        tsToType (ArrTS l r) = do
+          lt <- tsToType l
+          rt <- tsToType r
+          return (ArrT lt rt)
+        tsToType (DataTS name tss) = do
+          maybeArity <- getD (mLookup name)
+          arity <- case maybeArity of
+            Just (a, _) -> return a
+            Nothing -> typeError $ "undefined data type " ++ name
+          name' <-
+            if arity == length tss
+            then return name
+            else typeError "incomplete data type"
+          types <- traverse tsToType tss
+          return (DataT name' types)
 
-    tsToType :: TypeSig -> TState MType
-    tsToType (VarTS name) =
-      case mLookup name tpMap of
-        Just p -> return $ VarT p
-        Nothing -> typeError $ "undefined type parameter " ++ name
-    tsToType (ArrTS l r) = do
-      lt <- tsToType l
-      rt <- tsToType r
-      return (ArrT lt rt)
-    tsToType (DataTS name tss) = do
-      maybeArity <- getD (mLookup name)
-      arity <- case maybeArity of
-        Just (a, _) -> return a
-        Nothing -> typeError $ "undefined data type " ++ name
-      name' <- if arity == length tss then return name else typeError "incomplete data type"
-      types <- traverse tsToType tss
-      return (DataT name' types)
+inferGroup :: ValGroup Name -> TState [ValInfo]
+inferGroup (ValDef bind) = do
+  info <- inferValGroup bind
+  return [info]
+inferGroup (RecVal binds) =
+  inferRecGroup binds
 
-inferGroup :: [FnDef Name] -> TState [FnInfo]
-inferGroup group = do
-  (idents, mtypes) <- unzip <$> inferGroupM group
-  let names = map (\(FnDef name _ _) -> name) group
+inferValGroup :: Bind Name -> TState ValInfo
+inferValGroup (name, expr) = do
+  (ident, mtype) <- inferValGroupM (name, expr)
+  ptype <- generalize mtype
+  removeL ident
+  bindF (ident, ptype)
+  return (name, ptype)
+
+inferValGroupM :: Bind Name -> TState (Ident, MType)
+inferValGroupM (name, expr) = do
+  let ident = getIdent name
+  eType <- inferExpr expr
+  bindL (ident, eType)
+  return (ident, eType)
+
+inferRecGroup :: [Bind Name] -> TState [ValInfo]
+inferRecGroup group = do
+  (idents, mtypes) <- unzip <$> inferRecGroupM group
+  let names = map fst group
   ptypes <- traverse generalize mtypes
   traverse_ removeL idents
+  traverse_ bindF (zip idents ptypes)
   return $ zip names ptypes
 
-inferGroupM :: [FnDef Name] -> TState [(Ident, MType)]
-inferGroupM group = do
-  traverse_ constrFn group
-  traverse inferFn group
-
-constrFn :: FnDef Name -> TState ()
-constrFn (FnDef name params _) = do
-  let ident = getIdent name
-  ptypes <- newTypeVars (length params)
-  retType <- newTypeVar
-  let fType = foldr ArrT retType ptypes
-  bindL (ident, fType)
-
-inferFn :: FnDef Name -> TState (Ident, MType)
-inferFn (FnDef name params body) = do
-  let ident = getIdent name
-  fType <- getL (! ident)
-  let paramIdents = map getIdent params
-  let (paramTypes, retType) = paramBind paramIdents fType
-  traverse_ bindL (zip paramIdents paramTypes)
-  bType <- inferExpr body
-  unify retType bType
-  traverse_ removeL paramIdents
-  return (ident, fType)
+inferRecGroupM :: [Bind Name] -> TState [(Ident, MType)]
+inferRecGroupM group = do
+  traverse_ constrBind group
+  traverse inferBind group
+  where
+    constrBind (name, _) = do
+      bType <- newTypeVar
+      bindL (getIdent name, bType)
+    inferBind (name, expr) = do
+      let ident = getIdent name
+      bType <- getL (! ident)
+      eType <- inferExpr expr
+      unify bType eType
+      return (ident, bType)
 
 inferExpr :: Expr Name -> TState MType
 inferExpr (IntE _) = return mIntT
 inferExpr (VarE name) = do
   let id = getIdent name
   let lookup = mLookup id
-  maybelm <- getL lookup
-  case maybelm of
+  maybel <- getL lookup
+  case maybel of
     Just t -> return t
     Nothing -> do
       maybef <- getF lookup
@@ -216,13 +219,15 @@ inferExpr (CaseE expr brs) = do
   traverse_ (unify eType) patTypes
   traverse_ (unify brType) actualBrTs
   return brType
-inferExpr (LetE binds e) = do
-  let bindFns = map (\(name, expr) -> FnDef name [] expr) binds
-  let bindFnGrps = depGroupSort bindFns
-  bindFnIdents <-
-    map fst . concat <$> traverse inferGroupM bindFnGrps
+inferExpr (LetE bind e) = do
+  bIdent <- fst <$> inferValGroupM bind
   eType <- inferExpr e
-  traverse_ removeL bindFnIdents
+  removeL bIdent
+  return eType
+inferExpr (LetRecE binds e) = do
+  bIdents <- map fst <$> inferRecGroupM binds
+  eType <- inferExpr e
+  traverse_ removeL bIdents
   return eType
 inferExpr (LambdaE params e) = do
   ptypes <- newTypeVars (length params)
@@ -312,11 +317,11 @@ unify l r = do
 unifyP :: Int -> MType -> TState ()
 unifyP p t = case t of
   VarT p1 | p == p1 -> return ()
-  t | recCheck p t -> unifyError (VarT p) t
-    | otherwise    -> bindV (p, t)
+  t | recCheck p t -> unifyError p t
+    | otherwise -> bindV (p, t)
   where
-    recCheck p (VarT p1)    = p == p1
-    recCheck p (ArrT l r)   = recCheck p l || recCheck p r
+    recCheck p (VarT p1) = p == p1
+    recCheck p (ArrT l r) = recCheck p l || recCheck p r
     recCheck p (DataT _ ts) = foldl (\b t -> b || recCheck p t) False ts
 
 unifyError :: (Show a, Show b) => a -> b -> TState x
@@ -329,8 +334,8 @@ generalize t = do
   return (Forall (freeVarsR rt) rt)
   where
     freeVarsR :: MType -> Set Int
-    freeVarsR (VarT p)     = sSingleton p
-    freeVarsR (ArrT l r)   = freeVarsR l `sUnion` freeVarsR r
+    freeVarsR (VarT p) = sSingleton p
+    freeVarsR (ArrT l r) = freeVarsR l `sUnion` freeVarsR r
     freeVarsR (DataT n ts) = foldl sUnion emptySet (map freeVarsR ts)
 
 primData :: Map String DataAttr

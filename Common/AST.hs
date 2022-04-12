@@ -1,21 +1,22 @@
 module Common.AST where
 
-import Utils.Set
+import Utils.Function
 import Common.Def
-
-data TypeSig
-  = VarTS String
-  | DataTS String [TypeSig]
-  | ArrTS TypeSig TypeSig
-  deriving (Show)
 
 data Expr v
   = IntE Int
   | VarE v
   | AppE (Expr v) (Expr v)
   | CaseE (Expr v) [Branch v]
-  | LetE [Bind v] (Expr v)
+  | LetE (Bind v) (Expr v)
+  | LetRecE [Bind v] (Expr v)
   | LambdaE [v] (Expr v)
+  deriving (Show)
+
+data TypeSig
+  = VarTS RdrName
+  | DataTS RdrName [TypeSig]
+  | ArrTS TypeSig TypeSig
   deriving (Show)
 
 type Bind v = (v, Expr v)                 -- name, expression
@@ -23,39 +24,30 @@ type Branch v = (v, [v], Expr v)          -- constructor, bindings, body
 
 type Constructor v = (v, [TypeSig])       -- name, types
 
-data DataDef v =
-  DataDef String [String] [Constructor v] -- name, type params, constructors
+type DataBind v =
+  (RdrName, [RdrName], [Constructor v])   -- name, type params, constructors
+
+newtype DataGroup v
+  = RecData [DataBind v]
   deriving (Show)
 
-data FnDef v =
-  FnDef v [v] (Expr v)                    -- name, params, body
+data ValGroup v
+  = ValDef (Bind v)
+  | RecVal [Bind v]
   deriving (Show)
 
-type Program v = ([DataDef v], [FnDef v])
+type Program v = ([DataGroup v], [ValGroup v])
 
-depsOfExprIn :: Set Ident -> Expr Name -> Set Ident
-depsOfExprIn _ (IntE _) = emptySet
-depsOfExprIn knowns (VarE v) =
-  let id = getIdent v in
-  if sElem id knowns then sSingleton id else emptySet
-depsOfExprIn knowns (AppE e1 e2) =
-  depOf e1 `sUnion` depOf e2
-  where depOf = depsOfExprIn knowns
-depsOfExprIn knowns (CaseE e brs) =
-  foldl sUnion (depsOfExprIn knowns e) (map depsOfBr brs)
-  where
-    depsOfBr (_, brBinds, body) =
-      depsOfExprIn newKnowns body
-      where
-        newKnowns = foldl sRemove knowns (map getIdent brBinds)
-depsOfExprIn knowns (LetE binds e) =
-  foldl sUnion (depsOf e) (map depsOf bindExprs)
-  where
-    (bindNames, bindExprs) = unzip binds
-    bindIdents = map getIdent bindNames
-    newKnowns = foldl sRemove knowns bindIdents
-    depsOf = depsOfExprIn newKnowns
-depsOfExprIn knowns (LambdaE params e) =
-  depsOfExprIn newKnowns e
-  where
-    newKnowns = foldl sRemove knowns (map getIdent params)
+getValBinds :: ValGroup v -> [Bind v]
+getValBinds (ValDef val) = [val]
+getValBinds (RecVal vals) = vals
+
+getValNames :: ValGroup v -> [v]
+getValNames (ValDef val) = [fst val]
+getValNames (RecVal vals) = map fst vals
+
+getDataNames :: DataGroup v -> [RdrName]
+getDataNames (RecData datas) = map fst3 datas
+
+getConstrNames :: DataGroup v -> [v]
+getConstrNames (RecData datas) = map fst (concatMap trd3 datas)

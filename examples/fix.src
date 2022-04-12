@@ -1,15 +1,13 @@
-ifte b x y =
-  case b of
-  { True  -> x
-  ; False -> y
-  };
+fn ifte b x y =
+  match b with
+  | True  -> x
+  | False -> y
 
-take n l =
-  case l of
-  { Nil -> Nil
-  ; Cons h t -> ifte (eq 0 n) Nil (Cons h (take (sub n 1) t))
-  };
+rec fn take n l =
+  match l with
+  | Nil -> Nil
+  | Cons h t -> ifte (eq 0 n) Nil (Cons h (take (sub n 1) t))
 
-fix f = let { x = f x } in x;
+rec fn fix f = let rec x = f x in x;
 
-start n = take n (fix (Cons n))
+fn start n = take n (fix (Cons n))

@@ -1,6 +1,6 @@
-b2i b = case b of { True -> 1; False -> 0 };
+fn b2i b = match b with | True -> 1 | False -> 0
 
-start n =
+fn start n =
    Cons (add n 16)
   (Cons (sub n 16)
   (Cons (mul n 16)

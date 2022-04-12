@@ -6,6 +6,15 @@ first f (x, y) = (f x, y)
 second :: (b -> c) -> (a, b) -> (a, c)
 second f (x, y) = (x, f y)
 
+fst3 :: (a, b, c) -> a
+fst3 (a, b, c) = a
+
+snd3 :: (a, b, c) -> b
+snd3 (a, b, c) = b
+
+trd3 :: (a, b, c) -> c
+trd3 (a, b, c) = c
+
 assertJust :: Maybe t -> t
 assertJust (Just a) = a
 assertJust Nothing = error "expect Just"

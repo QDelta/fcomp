@@ -1,30 +1,26 @@
-ifte b x y =
-  case b of
-  { True  -> x
-  ; False -> y
-  };
+fn ifte b x y =
+  match b with
+  | True  -> x
+  | False -> y
 
-take n l =
-  case l of
-  { Nil -> Nil
-  ; Cons h t -> ifte (eq 0 n) Nil (Cons h (take (sub n 1) t))
-  };
+rec fn take n l =
+  match l with
+  | Nil -> Nil
+  | Cons h t -> ifte (eq 0 n) Nil (Cons h (take (sub n 1) t))
 
-zipWith f l1 l2 =
-  case l1 of
-  { Nil -> Nil
-  ; Cons h1 t1 -> case l2 of
-      { Nil -> Nil
-      ; Cons h2 t2 -> Cons (f h1 h2) (zipWith f t1 t2)
-      }
-  };
+rec fn zipWith f l1 l2 =
+  match l1 with
+  | Nil -> Nil
+  | Cons h1 t1 ->
+      match l2 with
+      | Nil -> Nil
+      | Cons h2 t2 -> Cons (f h1 h2) (zipWith f t1 t2)
 
-tail l =
-  case l of
-  { Nil -> Nil
-  ; Cons h t -> t
-  };
+fn tail l =
+  match l with
+  | Nil -> Nil
+  | Cons h t -> t
 
-fibs = Cons 1 (Cons 1 (zipWith add fibs (tail fibs)));
+rec val fibs = Cons 1 (Cons 1 (zipWith add fibs (tail fibs)))
 
-start n = take n fibs
+fn start n = take n fibs

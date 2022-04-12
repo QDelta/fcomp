@@ -1,6 +1,6 @@
-diverge = not diverge;
+rec val diverge = not diverge
 
-b2i b = case b of { False -> 0; True -> 1 };
+fn b2i b = match b with | True -> 1 | False -> 0
 
 -- [0, 1]
-start n = Cons (b2i (and False diverge)) (Cons (b2i (or True diverge)) Nil)
+fn start n = Cons (b2i (and False diverge)) (Cons (b2i (or True diverge)) Nil)

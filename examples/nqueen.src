@@ -1,67 +1,63 @@
-ifte b x y = case b of { False -> y; True -> x };
+fn ifte b x y =
+  match b with
+  | True  -> x
+  | False -> y
 
-foldl f x l =
-  case l of
-  { Nil -> x
-  ; Cons h t -> foldl f (f x h) t
-  };
+rec fn foldl f x l =
+  match l with
+  | Nil -> x
+  | Cons h t -> foldl f (f x h) t
 
-foldr f x l =
-  case l of
-  { Nil -> x
-  ; Cons h t -> f h (foldr f x t)
-  };
+rec fn foldr f x l =
+  match l with
+  | Nil -> x
+  | Cons h t -> f h (foldr f x t)
 
-map f l =
-  case l of
-  { Nil -> Nil
-  ; Cons h t -> Cons (f h) (map f t)
-  };
+rec fn map f l =
+  match l with
+  | Nil -> Nil
+  | Cons h t -> Cons (f h) (map f t)
 
-filter f l =
-  case l of
-  { Nil -> Nil
-  ; Cons h t ->
-      let { rest = filter f t } in
-        ifte (f h) (Cons h rest) rest
-  };
+rec fn filter f l =
+  match l with
+  | Nil -> Nil
+  | Cons h t ->
+      let rest = filter f t in
+      ifte (f h) (Cons h rest) rest
 
-length l =
-  case l of
-  { Nil -> 0
-  ; Cons h t -> add 1 (length t)
-  };
+rec fn length l =
+  match l with
+  | Nil -> 0
+  | Cons h t -> add 1 (length t)
 
-append l1 l2 =
-  case l1 of
-  { Nil -> l2
-  ; Cons h t -> Cons h (append t l2)
-  };
+rec fn append l1 l2 =
+  match l1 with
+  | Nil -> l2
+  | Cons h t -> Cons h (append t l2)
 
-concat = foldr append Nil;
+fn concat = foldr append Nil
 
-concatMap f l = concat (map f l);
+fn concatMap f l = concat (map f l)
 
-fromTo m n =
-  ifte (gt m n) Nil (Cons m (fromTo (add m 1) n));
+rec fn fromTo m n =
+  ifte (gt m n) Nil (Cons m (fromTo (add m 1) n))
 
-queens n = let
-  { loop boards counter =
-      ifte
-        (eq counter n)
-        boards
-        (loop (concatMap expand boards) (add counter 1))
-  ; expand board =
-      map
-        (\x -> Cons x board)
-        (filter (\x -> safe x board 1) (fromTo 1 n))
-  ; safe x l n =
-      case l of
-      { Nil -> True
-      ; Cons c y ->
-          and (ne x c) (and (ne x (add c n)) (and (ne x (sub c n)) (safe x y (add n 1))))
-      }
-  } in
-  loop (Cons Nil Nil) 0;
+fn queens n =
+  let rec loop boards counter =
+    ifte
+      (eq counter n)
+      boards
+      (loop (concatMap expand boards) (add counter 1))
+  with expand board =
+    map
+      (\x -> Cons x board)
+      (filter (\x -> safe x board 1) (fromTo 1 n))
+  with safe x l n =
+    match l with
+    | Nil -> True
+    | Cons c y ->
+        and (ne x c) (and (ne x (add c n)) (and (ne x (sub c n)) (safe x y (add n 1))))
+  in
+    loop (Cons Nil Nil) 0
 
-start n = concat (queens n)
+fn start n = concat (queens n)
