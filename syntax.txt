@@ -1,0 +1,27 @@
+    <program> ::= (<dataGroup>*) (<valGroup>+)
+
+  <dataGroup> ::= "data" <dataBind> ("with" <dataBind>)*
+   <dataBind> ::= <UNAME> <LNAME>* "=" <constructor> ("|" <constructor>)*
+<constructor> ::= <UNAME> <typeSig>*
+
+    <typeSig> ::= <tsTerm> ("->" <tsTerm>*)
+     <tsTerm> ::= <UNAME> <tsAtom>*
+     <tsAtom> ::= <LNAME>
+               |  "(" <typeSig> ")"
+
+   <valGroup> ::= <VAL> <bind>
+               |  "rec" <VAL> <bind> ("with" <bind>)*
+       <bind> ::= <LNAME>+ "=" <expr>
+       <expr> ::= "match" <expr> "with" <branch>+
+               |  "let" <bind> "in" <expr>
+               |  "let" "rec" <bind> ("with" <bind>)* "in" <expr>
+               |  '\' <LNAME>+ "->" <expr>
+               |  <exprAtom>+
+   <exprAtom> ::= <INT> | <LNAME> | <UNAME>
+               |  "(" <expr> ")"
+     <branch> ::= "|" <UNAME> <LNAME>* "->" <expr>
+
+      <UNAME> ::= [A-Z][a-zA-Z0-9]*
+      <LNAME> ::= [a-z][a-zA-Z0-9]*
+       <NAME> ::= <UNAME> | <LNAME>
+        <INT> ::= [0-9]+
