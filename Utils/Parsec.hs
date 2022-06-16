@@ -7,6 +7,7 @@ module Utils.Parsec
   , pseq
   , psat
   , psym
+  , pmaybe
   , pstar
   , pplus
   , pinterleave
@@ -61,6 +62,9 @@ psat f = do
 
 psym :: Eq i => i -> Parser i i
 psym x = psat (== x)
+
+pmaybe :: Parser i o -> Parser i (Maybe o)
+pmaybe p = fmap Just p <|> pure Nothing
 
 pstar :: Parser i o -> Parser i [o]
 pstar p = pplus p <|> return []

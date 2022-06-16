@@ -20,10 +20,7 @@ A compiler for a statically typed, purely functional programming language with l
 ### Example
 
 ```bash
-make
-build/fcomp examples/nprime.src
-gcc -O2 build/main.c -o build/main
-echo "64" | build/main
+make test SRC=examples/nprime.src INPUT=64
 ```
 
 [Implementing Functional Languages: a tutorial](https://www.microsoft.com/en-us/research/publication/implementing-functional-languages-a-tutorial/)

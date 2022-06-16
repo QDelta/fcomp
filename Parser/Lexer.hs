@@ -56,6 +56,7 @@ nameLex f s = (tn, rest)
       "data"  -> DataKW
       "match" -> MatchKW
       "with"  -> WithKW
+      "end"   -> EndKW
       "val"   -> ValKW
       "fn"    -> ValKW
       "rec"   -> RecKW

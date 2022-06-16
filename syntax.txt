@@ -12,7 +12,7 @@
    <valGroup> ::= <VAL> <bind>
                |  "rec" <VAL> <bind> ("with" <bind>)*
        <bind> ::= <LNAME>+ "=" <expr>
-       <expr> ::= "match" <expr> "with" <branch>+
+       <expr> ::= "match" <expr> "with" <branch>+ "end"?
                |  "let" <bind> "in" <expr>
                |  "let" "rec" <bind> ("with" <bind>)* "in" <expr>
                |  '\' <LNAME>+ "->" <expr>

@@ -1,7 +1,8 @@
 -include Makefile.config
 
 GHC  ?= ghc
-ODIR ?= build
+ODIR := build
+CC   := gcc -O2
 
 all: fcomp
 
@@ -11,7 +12,13 @@ fcomp: $(ODIR)
 $(ODIR):
 	mkdir $(ODIR)
 
+test: fcomp
+	$(ODIR)/fcomp $(SRC) $(ODIR)/main.c
+	@echo
+	@$(CC) $(ODIR)/main.c -o $(ODIR)/main
+	@echo $(INPUT) | $(ODIR)/main
+
 clean:
 	rm -r $(ODIR)
 
-.PHONY: fcomp clean
+.PHONY: fcomp test clean

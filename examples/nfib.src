@@ -10,11 +10,12 @@ rec fn take n l =
 
 rec fn zipWith f l1 l2 =
   match l1 with
-  | Nil -> Nil
   | Cons h1 t1 ->
       match l2 with
       | Nil -> Nil
       | Cons h2 t2 -> Cons (f h1 h2) (zipWith f t1 t2)
+      end
+  | Nil -> Nil
 
 fn tail l =
   match l with

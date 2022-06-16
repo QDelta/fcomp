@@ -1,6 +1,0 @@
-#!/bin/sh
-
-make && echo
-build/fcomp examples/$1.src && echo
-gcc -O2 build/main.c -o build/main &&
-echo $2 | build/main

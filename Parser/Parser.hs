@@ -8,7 +8,7 @@ import Common.AST
 
 data Token
   = LParen | RParen
-  | DataKW | MatchKW | WithKW
+  | DataKW | MatchKW | WithKW | EndKW
   | ValKW | RecKW
   | LetKW | InKW
   | Arrow | Equal | Or | BSlash
@@ -115,6 +115,7 @@ pExpr =
     e <- pExpr
     psym WithKW
     brs <- pplus pBranch
+    pmaybe (psym EndKW)
     return (CaseE e brs)
   ) <|>
   (do
