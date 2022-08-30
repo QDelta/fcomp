@@ -1,8 +1,8 @@
 -include Makefile.config
 
 GHC  ?= ghc
-ODIR := build
-CC   := gcc -O2
+ODIR ?= build
+CC   ?= gcc -O2
 
 all: fcomp
 
