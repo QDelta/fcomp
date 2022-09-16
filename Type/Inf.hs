@@ -85,7 +85,7 @@ infer prog =
     showData (name, (arity, _)) =
       name ++ " :: " ++ concat (replicate arity "* -> ") ++ "*"
     showVal (name, t) =
-      getName name ++ " :: " ++ show t
+      getName name ++ " : " ++ show t
 
 inferProgram :: Program Name -> TState ([DataInfo], [ValInfo])
 inferProgram (dataGrps, groups) = do

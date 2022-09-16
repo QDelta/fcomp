@@ -56,14 +56,17 @@ do { \
 
 #define BOTTOM(type) (*((type *)(bp - sizeof(type))))
 
+#define INT_NODE(val) ((ptr_t)(((val) << 1) | 1))
+#define IS_INT_NODE(ptr) ((int_t)(ptr) & 1)
+#define GET_INT_VAL(ptr) ((int_t)(ptr) >> 1)
+
 /** node **/
 
 #define NAPP    0
 #define NGLOBAL 1
 #define NIND    2
 #define NDATA   3
-#define NINT    4
-#define NNULL   5
+#define NNULL   4
 
 #define FALSE 0
 #define TRUE  1
@@ -71,6 +74,12 @@ do { \
 struct _node;
 typedef struct _node node_t;
 typedef node_t *node_ptr_t;
+
+// The size of a pointer must be 8 byte
+
+// 63-bit integer node is represented
+// in higher 63 bits of node_ptr_t
+// with 1 on the lowest bit
 
 struct _node {
     node_ptr_t gc_forwarding;
@@ -83,7 +92,6 @@ struct _node {
         struct { int_t g_arity;   func_t code;      }; // global
         struct { node_ptr_t to;                     }; // indirection
         struct { int_t tag;       int_t d_arity;    }; // data
-        struct { int_t intv;                        }; // int
     };
     node_ptr_t d_params[]; // flexible array for data node
 };
@@ -154,7 +162,7 @@ void gc_mark_children(node_ptr_t p) {
 }
 
 void gc_mark(node_ptr_t p) {
-    if (! p->gc_isglobal && ! p->gc_reachable) {
+    if (! IS_INT_NODE(p) && ! p->gc_isglobal && ! p->gc_reachable) {
         p->gc_reachable = TRUE;
         gc_mark_children(p);
     }
@@ -163,15 +171,23 @@ void gc_mark(node_ptr_t p) {
 void gc_update(node_ptr_t p) {
     switch (p->type) {
     case NAPP:
-        p->left = p->left->gc_forwarding;
-        p->right = p->right->gc_forwarding;
+        if (! IS_INT_NODE(p->left)) {
+            p->left = p->left->gc_forwarding;
+        }
+        if (! IS_INT_NODE(p->right)) {
+            p->right = p->right->gc_forwarding;
+        }
         break;
     case NIND:
-        p->to = p->to->gc_forwarding;
+        if (! IS_INT_NODE(p->to)) {
+            p->to = p->to->gc_forwarding;
+        }
         break;
     case NDATA:
         for (int_t i = p->d_arity - 1; i >= 0; --i) {
-            p->d_params[i] = p->d_params[i]->gc_forwarding;
+            if (! IS_INT_NODE(p->d_params[i])) {
+                p->d_params[i] = p->d_params[i]->gc_forwarding;
+            }
         }
         break;
     default:
@@ -230,7 +246,10 @@ void global_gc(void) {
     _bp = bp;
     while (1) {
         while (sp < bp) {
-            PEEK(node_ptr_t) = PEEK(node_ptr_t)->gc_forwarding;
+            node_ptr_t top = PEEK(node_ptr_t);
+            if (! IS_INT_NODE(top)) {
+                PEEK(node_ptr_t) = top->gc_forwarding;
+            }
             POP(node_ptr_t);
         }
         if (bp == stack + STACK_SIZE)
@@ -277,9 +296,7 @@ void inst_pushg(int_t g_offset) {
 }
 
 void inst_pushi(int_t val) {
-    node_ptr_t p = node_alloc(0);
-    p->type = NINT;
-    p->intv = val;
+    node_ptr_t p = INT_NODE(val);
     PUSH(node_ptr_t, p);
 }
 
@@ -341,6 +358,10 @@ void inst_eval(void) {
 
     while (1) {
         node_ptr_t p = PEEK(node_ptr_t);
+        if (IS_INT_NODE(p)) {
+            goto eval_data;
+        }
+
         int_t arity;
         switch (p->type) {
         case NAPP:
@@ -366,12 +387,16 @@ void inst_eval(void) {
             }
             break;
         default:
-            sp = bp;
-            bp = PEEK(ptr_t);
-            POP(ptr_t);
-            PUSH(node_ptr_t, p);
-            return;
+            goto eval_data;
         }
+        continue;
+
+eval_data:
+        sp = bp;
+        bp = PEEK(ptr_t);
+        POP(ptr_t);
+        PUSH(node_ptr_t, p);
+        return;
     }
 }
 
@@ -389,11 +414,9 @@ void inst_alloc(int_t n) {
 
 #define INST_INT_ARITH_BINOP(op) \
     do { \
-        node_ptr_t p = node_alloc(0); \
         node_ptr_t p0 = PEEK_OFFSET(node_ptr_t, 0); \
         node_ptr_t p1 = PEEK_OFFSET(node_ptr_t, 1); \
-        p->type = NINT; \
-        p->intv = (p0->intv) op (p1->intv); \
+        node_ptr_t p = INT_NODE(GET_INT_VAL(p0) op GET_INT_VAL(p1)); \
         POP_N(node_ptr_t, 2); \
         PUSH(node_ptr_t, p); \
     } while (0) \
@@ -410,7 +433,7 @@ void inst_rem(void) { INST_INT_ARITH_BINOP(%); }
         node_ptr_t p0 = PEEK_OFFSET(node_ptr_t, 0); \
         node_ptr_t p1 = PEEK_OFFSET(node_ptr_t, 1); \
         p->type = NDATA; \
-        p->tag = (p0->intv) op (p1->intv) ? 1 : 0; \
+        p->tag = GET_INT_VAL(p0) op GET_INT_VAL(p1) ? 1 : 0; \
         p->d_arity = 0; \
         POP_N(node_ptr_t, 2); \
         PUSH(node_ptr_t, p); \
@@ -438,17 +461,17 @@ int_t entry_func_offset;
 void print_head(const char *format) {
     inst_split();
     inst_eval();
-    printf(format, PEEK(node_ptr_t)->intv);
+    printf(format, GET_INT_VAL(PEEK(node_ptr_t)));
     inst_pop(1);
     inst_eval();
 }
 
 void print_stat() {
-    printf("GC count: %lld\n", stat_gc_count);
-    printf("GC threshold now: %lld bytes\n", gc_threshold);
-    printf("GC time: %.2f ms\n", 1000.0 * stat_gc_clock / CLOCKS_PER_SEC);
-    printf("Maximum stack usage: %lld bytes\n", stat_max_stack_size);
-    printf("Maximum heap usage: %lld bytes\n", stat_max_heap_size);
+    fprintf(stderr, "GC count: %lld\n", stat_gc_count);
+    fprintf(stderr, "GC threshold now: %lld bytes\n", gc_threshold);
+    fprintf(stderr, "GC time: %.2f ms\n", 1000.0 * stat_gc_clock / CLOCKS_PER_SEC);
+    fprintf(stderr, "Maximum stack usage: %lld bytes\n", stat_max_stack_size);
+    fprintf(stderr, "Maximum heap usage: %lld bytes\n", stat_max_heap_size);
 }
 
 int main(void) {
@@ -473,7 +496,7 @@ int main(void) {
     printf("\n\n");
 
     clock_t prog_end_clock = clock();
-    printf("Execution time: %.2f ms\n", 1000.0 * (prog_end_clock - prog_start_clock) / CLOCKS_PER_SEC);
+    fprintf(stderr, "Execution time: %.2f ms\n", 1000.0 * (prog_end_clock - prog_start_clock) / CLOCKS_PER_SEC);
     print_stat();
 
     return 0;
