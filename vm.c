@@ -22,15 +22,20 @@ typedef void (*func_t)(void);
 #define HEAP_SIZE (1ULL << 24)
 #endif
 
+#define HALF_HEAP_SIZE (HEAP_SIZE >> 1)
+
 static byte_t stack[STACK_SIZE];
-static byte_t heap[HEAP_SIZE];
+static byte_t heap1[HALF_HEAP_SIZE];
+static byte_t heap2[HALF_HEAP_SIZE];
 
 static ptr_t bp = stack + STACK_SIZE;
 static ptr_t sp = stack + STACK_SIZE;
 // stack space: sp <= addr < bp
 
-static ptr_t brk = heap;
-// heap_space: memory <= addr < brk
+static ptr_t heap = heap1;
+static ptr_t heap_to = heap2;
+static ptr_t brk = heap1;
+// heap_space: heap <= addr < brk
 
 int_t stat_max_stack_size = 0;
 
@@ -84,7 +89,7 @@ typedef node_t *node_ptr_t;
 struct _node {
     node_ptr_t gc_forwarding;
     int_t gc_blksize;
-    byte_t gc_reachable; // dummy in free block
+    byte_t gc_copied; // dummy in free block
     byte_t gc_isglobal;  // dummy in free block
     byte_t type;
     union {
@@ -112,13 +117,13 @@ node_ptr_t node_alloc(int_t d_arity) {
     int_t heap_size = (ptr_t)brk - (ptr_t)heap;
     int_t new_heap_size = heap_size + alloc_size;
     if (heap_size >= gc_threshold
-     || new_heap_size > HEAP_SIZE) {
+     || new_heap_size > HALF_HEAP_SIZE) {
 
         global_gc();
 
         heap_size = (ptr_t)brk - (ptr_t)heap;
         new_heap_size = heap_size + alloc_size;
-        if (new_heap_size > HEAP_SIZE) {
+        if (new_heap_size > HALF_HEAP_SIZE) {
             fputs("Out of memory!\n", stderr);
             exit(1);
         }
@@ -133,61 +138,40 @@ node_ptr_t node_alloc(int_t d_arity) {
     node_ptr_t new_node = (node_ptr_t)brk;
     brk += alloc_size;
 
-    new_node->gc_reachable = FALSE;
+    new_node->gc_copied = FALSE;
     new_node->gc_isglobal = FALSE;
     new_node->gc_blksize = alloc_size;
 
     return new_node;
 }
 
-void gc_mark(node_ptr_t p);
+node_ptr_t gc_copy(node_ptr_t p) {
+    if (IS_INT_NODE(p) || p->gc_isglobal) {
+        return p;
+    }
 
-void gc_mark_children(node_ptr_t p) {
+    if (! p->gc_copied) {
+        memcpy(brk, p, p->gc_blksize);
+        p->gc_forwarding = brk;
+        p->gc_copied = TRUE;
+        brk += p->gc_blksize;
+    }
+
+    return p->gc_forwarding;
+}
+
+void gc_copy_children(node_ptr_t p) {
     switch (p->type) {
     case NAPP:
-        gc_mark(p->left);
-        gc_mark(p->right);
+        p->left = gc_copy(p->left);
+        p->right = gc_copy(p->right);
         break;
     case NIND:
-        gc_mark(p->to);
+        p->to = gc_copy(p->to);
         break;
     case NDATA:
         for (int_t i = p->d_arity - 1; i >= 0; --i) {
-            gc_mark(p->d_params[i]);
-        }
-        break;
-    default:
-        break;
-    }
-}
-
-void gc_mark(node_ptr_t p) {
-    if (! IS_INT_NODE(p) && ! p->gc_isglobal && ! p->gc_reachable) {
-        p->gc_reachable = TRUE;
-        gc_mark_children(p);
-    }
-}
-
-void gc_update(node_ptr_t p) {
-    switch (p->type) {
-    case NAPP:
-        if (! IS_INT_NODE(p->left)) {
-            p->left = p->left->gc_forwarding;
-        }
-        if (! IS_INT_NODE(p->right)) {
-            p->right = p->right->gc_forwarding;
-        }
-        break;
-    case NIND:
-        if (! IS_INT_NODE(p->to)) {
-            p->to = p->to->gc_forwarding;
-        }
-        break;
-    case NDATA:
-        for (int_t i = p->d_arity - 1; i >= 0; --i) {
-            if (! IS_INT_NODE(p->d_params[i])) {
-                p->d_params[i] = p->d_params[i]->gc_forwarding;
-            }
+            p->d_params[i] = gc_copy(p->d_params[i]);
         }
         break;
     default:
@@ -199,20 +183,23 @@ node_ptr_t globals;
 int_t global_num;
 void global_init(void);
 
-// LISP2 GC algorithm
+// Cheney algorithm
 void global_gc(void) {
     clock_t stat_gc_start_clock = clock();
 
-    // 1: mark
+    brk = heap_to;
+    ptr_t scan = heap_to;
+
+    // scan roots
     for (int_t i = 0; i < global_num; ++i) {
-        gc_mark_children(globals + i);
+        gc_copy_children(globals + i);
     }
 
     ptr_t _sp = sp;
     ptr_t _bp = bp;
     while (1) {
         while (sp < bp) {
-            gc_mark(PEEK(node_ptr_t));
+            PEEK(node_ptr_t) = gc_copy(PEEK(node_ptr_t));
             POP(node_ptr_t);
         }
         if (bp == stack + STACK_SIZE)
@@ -225,66 +212,15 @@ void global_gc(void) {
     sp = _sp;
     bp = _bp;
 
-    // 2: set forwarding
-    ptr_t new_position = (ptr_t)heap;
-    node_ptr_t p = (node_ptr_t)heap;
-    while ((ptr_t)p < (ptr_t)brk) {
-        int_t blk_size = p->gc_blksize;
-        if (p->gc_reachable) {
-            p->gc_forwarding = (node_ptr_t)new_position;
-            new_position = OFFSET(new_position, blk_size);
-        }
-        p = OFFSET(p, blk_size);
+    // scan to-space
+    while (scan < brk) {
+        gc_copy_children(scan);
+        scan += ((node_ptr_t)scan)->gc_blksize;
     }
 
-    // 3: update forwarding
-    for (int_t i = 0; i < global_num; ++i) {
-        gc_update(globals + i);
-    }
-
-    _sp = sp;
-    _bp = bp;
-    while (1) {
-        while (sp < bp) {
-            node_ptr_t top = PEEK(node_ptr_t);
-            if (! IS_INT_NODE(top)) {
-                PEEK(node_ptr_t) = top->gc_forwarding;
-            }
-            POP(node_ptr_t);
-        }
-        if (bp == stack + STACK_SIZE)
-            break;
-        else {
-            bp = PEEK(ptr_t);
-            POP(ptr_t);
-        }
-    }
-    sp = _sp;
-    bp = _bp;
-
-    p = (node_ptr_t)heap;
-    while ((ptr_t)p < (ptr_t)brk) {
-        if (p->gc_reachable) {
-            gc_update(p);
-        }
-        p = OFFSET(p, p->gc_blksize);
-    }
-
-    // 4: move objects
-    node_ptr_t new_p;
-    p = (node_ptr_t)heap;
-    while ((ptr_t)p < (ptr_t)brk) {
-        int_t blk_size = p->gc_blksize;
-        if (p->gc_reachable) {
-            new_p = p->gc_forwarding;
-            memmove(new_p, p, blk_size);
-            new_p->gc_reachable = FALSE;
-        }
-        p = OFFSET(p, blk_size);
-    }
-
-    // 5: update brk
-    brk = OFFSET(new_p, new_p->gc_blksize);
+    ptr_t tmp = heap;
+    heap = heap_to;
+    heap_to = tmp;
 
     stat_gc_count += 1;
     clock_t stat_gc_end_clock = clock();
@@ -357,7 +293,7 @@ void inst_eval(void) {
     PUSH(node_ptr_t, p);
 
     while (1) {
-        node_ptr_t p = PEEK(node_ptr_t);
+        p = PEEK(node_ptr_t);
         if (IS_INT_NODE(p)) {
             goto eval_data;
         }
@@ -389,15 +325,13 @@ void inst_eval(void) {
         default:
             goto eval_data;
         }
-        continue;
+    }
 
 eval_data:
-        sp = bp;
-        bp = PEEK(ptr_t);
-        POP(ptr_t);
-        PUSH(node_ptr_t, p);
-        return;
-    }
+    sp = bp;
+    bp = PEEK(ptr_t);
+    POP(ptr_t);
+    PUSH(node_ptr_t, p);
 }
 
 void inst_pop(int_t n) {
