@@ -40,7 +40,7 @@ mangleGOffset :: GName -> String
 mangleGOffset name = mangle name ++ "_offset"
 
 genFnGOffset :: GlobalDef -> CCode
-genFnGOffset (name, _, _) = "int_t " ++ mangleGOffset name ++ ";\n"
+genFnGOffset (name, _, _) = "i64_t " ++ mangleGOffset name ++ ";\n"
 
 genFn :: GlobalDef -> CCode
 genFn (name, _, code) =

@@ -5,8 +5,10 @@
 
 extern void exit(int);
 
-typedef unsigned char byte_t;
-typedef long long int_t;
+typedef unsigned char u8_t;
+typedef long long i64_t;
+typedef unsigned short u16_t;
+typedef unsigned int u32_t;
 typedef void *ptr_t;
 typedef void (*func_t)(void);
 
@@ -24,9 +26,9 @@ typedef void (*func_t)(void);
 
 #define HALF_HEAP_SIZE (HEAP_SIZE >> 1)
 
-static byte_t stack[STACK_SIZE];
-static byte_t heap1[HALF_HEAP_SIZE];
-static byte_t heap2[HALF_HEAP_SIZE];
+static u8_t stack[STACK_SIZE];
+static u8_t heap1[HALF_HEAP_SIZE];
+static u8_t heap2[HALF_HEAP_SIZE];
 
 static ptr_t bp = stack + STACK_SIZE;
 static ptr_t sp = stack + STACK_SIZE;
@@ -37,12 +39,12 @@ static ptr_t heap_to = heap2;
 static ptr_t brk = heap1;
 // heap_space: heap <= addr < brk
 
-int_t stat_max_stack_size = 0;
+i64_t stat_max_stack_size = 0;
 
 #define PUSH(type, val) \
 do { \
     sp -= sizeof(type); \
-    int_t stk_size = (ptr_t)(stack + STACK_SIZE) - sp; \
+    i64_t stk_size = (ptr_t)(stack + STACK_SIZE) - sp; \
     if (sp < (ptr_t)stack) { \
         fputs("Stack overflow!\n", stderr); \
         exit(1); \
@@ -62,8 +64,8 @@ do { \
 #define BOTTOM(type) (*((type *)(bp - sizeof(type))))
 
 #define INT_NODE(val) ((ptr_t)(((val) << 1) | 1))
-#define IS_INT_NODE(ptr) ((int_t)(ptr) & 1)
-#define GET_INT_VAL(ptr) ((int_t)(ptr) >> 1)
+#define IS_INT_NODE(ptr) ((i64_t)(ptr) & 1)
+#define GET_INT_VAL(ptr) ((i64_t)(ptr) >> 1)
 
 /** node **/
 
@@ -88,15 +90,15 @@ typedef node_t *node_ptr_t;
 
 struct _node {
     node_ptr_t gc_forwarding;
-    int_t gc_blksize;
-    byte_t gc_copied; // dummy in free block
-    byte_t gc_isglobal;  // dummy in free block
-    byte_t type;
+    u32_t gc_blksize;
+    u8_t gc_copied; // dummy in free block
+    u8_t gc_isglobal; // dummy in free block
+    u8_t type;
     union {
         struct { node_ptr_t left; node_ptr_t right; }; // application
-        struct { int_t g_arity;   func_t code;      }; // global
+        struct { i64_t g_arity;   func_t code;      }; // global
         struct { node_ptr_t to;                     }; // indirection
-        struct { int_t tag;       int_t d_arity;    }; // data
+        struct { i64_t tag;       i64_t d_arity;    }; // data
     };
     node_ptr_t d_params[]; // flexible array for data node
 };
@@ -105,17 +107,17 @@ struct _node {
 
 #define GC_INIT_THRESHOLD 4096
 
-int_t gc_threshold = GC_INIT_THRESHOLD;
-int_t stat_gc_count = 0;
-int_t stat_max_heap_size = 0;
+i64_t gc_threshold = GC_INIT_THRESHOLD;
+i64_t stat_gc_count = 0;
+i64_t stat_max_heap_size = 0;
 clock_t stat_gc_clock = 0;
 void global_gc(void);
 
-node_ptr_t node_alloc(int_t d_arity) {
-    int_t alloc_size = NODE_SIZE(d_arity);
+node_ptr_t node_alloc(i64_t d_arity) {
+    i64_t alloc_size = NODE_SIZE(d_arity);
 
-    int_t heap_size = (ptr_t)brk - (ptr_t)heap;
-    int_t new_heap_size = heap_size + alloc_size;
+    i64_t heap_size = (ptr_t)brk - (ptr_t)heap;
+    i64_t new_heap_size = heap_size + alloc_size;
     if (heap_size >= gc_threshold
      || new_heap_size > HALF_HEAP_SIZE) {
 
@@ -170,7 +172,7 @@ void gc_copy_children(node_ptr_t p) {
         p->to = gc_copy(p->to);
         break;
     case NDATA:
-        for (int_t i = p->d_arity - 1; i >= 0; --i) {
+        for (i64_t i = p->d_arity - 1; i >= 0; --i) {
             p->d_params[i] = gc_copy(p->d_params[i]);
         }
         break;
@@ -180,7 +182,7 @@ void gc_copy_children(node_ptr_t p) {
 }
 
 node_ptr_t globals;
-int_t global_num;
+i64_t global_num;
 void global_init(void);
 
 // Cheney algorithm
@@ -191,7 +193,7 @@ void global_gc(void) {
     ptr_t scan = heap_to;
 
     // scan roots
-    for (int_t i = 0; i < global_num; ++i) {
+    for (i64_t i = 0; i < global_num; ++i) {
         gc_copy_children(globals + i);
     }
 
@@ -227,16 +229,16 @@ void global_gc(void) {
     stat_gc_clock += stat_gc_end_clock - stat_gc_start_clock;
 }
 
-void inst_pushg(int_t g_offset) {
+void inst_pushg(i64_t g_offset) {
     PUSH(node_ptr_t, globals + g_offset);
 }
 
-void inst_pushi(int_t val) {
+void inst_pushi(i64_t val) {
     node_ptr_t p = INT_NODE(val);
     PUSH(node_ptr_t, p);
 }
 
-void inst_push(int_t offset) {
+void inst_push(i64_t offset) {
     node_ptr_t p = PEEK_OFFSET(node_ptr_t, offset);
     PUSH(node_ptr_t, p);
 }
@@ -252,19 +254,19 @@ void inst_mkapp(void) {
     PUSH(node_ptr_t, p);
 }
 
-void inst_update(int_t offset) {
+void inst_update(i64_t offset) {
     node_ptr_t p = PEEK(node_ptr_t);
     POP(node_ptr_t);
     PEEK_OFFSET(node_ptr_t, offset)->type = NIND;
     PEEK_OFFSET(node_ptr_t, offset)->to = p;
 }
 
-void inst_pack(int_t tag, int_t arity) {
+void inst_pack(i64_t tag, i64_t arity) {
     node_ptr_t p = node_alloc(arity);
     p->type = NDATA;
     p->tag = tag;
     p->d_arity = arity;
-    for (int_t i = 0; i < arity; ++i) {
+    for (i64_t i = 0; i < arity; ++i) {
         p->d_params[i] = PEEK(node_ptr_t);
         POP(node_ptr_t);
     }
@@ -273,14 +275,14 @@ void inst_pack(int_t tag, int_t arity) {
 
 void inst_split(void) {
     node_ptr_t p = PEEK(node_ptr_t);
-    int_t d_arity = p->d_arity;
+    i64_t d_arity = p->d_arity;
     POP(node_ptr_t);
-    for (int_t i = d_arity - 1; i >= 0; --i) {
+    for (i64_t i = d_arity - 1; i >= 0; --i) {
         PUSH(node_ptr_t, p->d_params[i]);
     }
 }
 
-void inst_slide(int_t n) {
+void inst_slide(i64_t n) {
     PEEK_OFFSET(node_ptr_t, n) = PEEK(node_ptr_t);
     POP_N(node_ptr_t, n);
 }
@@ -298,7 +300,7 @@ void inst_eval(void) {
             goto eval_data;
         }
 
-        int_t arity;
+        i64_t arity;
         switch (p->type) {
         case NAPP:
             PUSH(node_ptr_t, p->left);
@@ -309,7 +311,7 @@ void inst_eval(void) {
         case NGLOBAL:
             arity = p->g_arity;
             if (bp - sp >= (arity + 1) * sizeof(node_ptr_t)) {
-                for (int_t i = 0; i < arity; ++i) {
+                for (i64_t i = 0; i < arity; ++i) {
                     PEEK_OFFSET(node_ptr_t, i) = PEEK_OFFSET(node_ptr_t, i + 1)->right;
                 }
                 p->code();
@@ -334,12 +336,12 @@ eval_data:
     PUSH(node_ptr_t, p);
 }
 
-void inst_pop(int_t n) {
+void inst_pop(i64_t n) {
     POP_N(node_ptr_t, n);
 }
 
-void inst_alloc(int_t n) {
-    for (int_t i = 0; i < n; ++i) {
+void inst_alloc(i64_t n) {
+    for (i64_t i = 0; i < n; ++i) {
         node_ptr_t p = node_alloc(0);
         p->type = NNULL;
         PUSH(node_ptr_t, p);
@@ -390,7 +392,7 @@ void inst_not(void) {
     PUSH(node_ptr_t, p);
 }
 
-int_t entry_func_offset;
+i64_t entry_func_offset;
 
 void print_head(const char *format) {
     inst_split();
@@ -413,7 +415,7 @@ int main(void) {
 
     global_init();
 
-    int_t input;
+    i64_t input;
     scanf("%lld", &input);
 
     inst_pushi(input);
