@@ -64,6 +64,8 @@ compileFn (name, params, body) = do
 compileWHNF :: Stack -> CoreExpr -> CState Code
 compileWHNF _ (IntCE n) =
   return [PushI n]
+compileWHNF st (HNFCE constr params) = do
+  error ""
 compileWHNF st (CaseCE e brs) = do
   eCode <- compileWHNF st e
   brCodes <- traverse (compileBranch st) brs
@@ -103,6 +105,8 @@ compileLazy st (LVarCE i) =
   return [Push (getOffset st i)]
 compileLazy _ (IntCE n) =
   return [PushI n]
+compileLazy st (HNFCE constr params) = do
+  error ""
 compileLazy st (AppCE e1 e2) = do
   code2 <- compileLazy st e2
   code1 <- compileLazy (push st 1) e1
@@ -156,8 +160,7 @@ compileBranch st (tag, binds, body) = do
 
 compileConstr :: CoreConstr -> CompiledCoreConstr
 compileConstr (name, arity, tag) =
-  (name, arity, tag, pushP ++ [Pack tag arity, Update arity, Pop arity])
-  where pushP = replicate arity (Push (arity - 1))
+  (name, arity, tag, [Pack tag arity, Update 0])
 
 compile :: CoreProgram -> CompiledCore
 compile (cs, fs) =

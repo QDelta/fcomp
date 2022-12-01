@@ -9,6 +9,7 @@ data CoreExpr
   | LiftedFn Ident
   | LVarCE Ident
   | IntCE  Int
+  | HNFCE CoreConstr [CoreExpr]        -- saturated constructor
   | AppCE CoreExpr CoreExpr
   | CaseCE CoreExpr [CoreBranch]
   | LetCE CoreBind CoreExpr            -- bind, expression
