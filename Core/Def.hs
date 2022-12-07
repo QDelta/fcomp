@@ -5,7 +5,8 @@ import Common.Def
 
 -- Core is not strongly typed
 data CoreExpr
-  = GVarCE Name
+  = GFnCE Name
+  | GConstrCE Name
   | LiftedFn Ident
   | LVarCE Ident
   | IntCE  Int
@@ -25,12 +26,16 @@ type CoreFn = (Name, [Ident], CoreExpr)    -- name, params, body
 type CoreProgram = ([CoreConstr], [CoreFn])
 
 localVarsExcept :: Set Ident -> CoreExpr -> Set Ident
-localVarsExcept _ (GVarCE _) = emptySet
+localVarsExcept _ (GFnCE _) = emptySet
+localVarsExcept _ (GConstrCE _) = emptySet
 localVarsExcept _ (LiftedFn _) = emptySet
 localVarsExcept _ (IntCE _) = emptySet
 
 localVarsExcept eSet (LVarCE id) =
   if id `sElem` eSet then emptySet else sSingleton id
+
+localVarsExcept eSet (HNFCE c es) =
+  foldl sUnion emptySet (map (localVarsExcept eSet) es)
 
 localVarsExcept eSet (AppCE e1 e2) =
   locals e1 `sUnion` locals e2
@@ -61,6 +66,8 @@ localVarsExcept eSet (LambdaCE ps e) =
 replaceLocal :: Ident -> CoreExpr -> CoreExpr -> CoreExpr
 replaceLocal id replE e = case e of
   LVarCE id' | id == id' -> replE
+  HNFCE c es ->
+    HNFCE c (map replace es)
   AppCE e1 e2 ->
     AppCE (replace e1) (replace e2)
   CaseCE e brs ->

@@ -84,7 +84,7 @@ pBind = do
   ps <- pstar pLName
   psym Equal
   b <- pExpr
-  return (n, LambdaE ps b)
+  return (n, if null ps then b else LambdaE ps b)
 
 pConstructor :: TParser (Constructor RdrName)
 pConstructor = do

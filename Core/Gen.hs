@@ -51,12 +51,13 @@ genFn gInfo (name, expr) =
 
 genExpr :: GlobalInfo -> Expr Name -> CoreExpr
 genExpr _ (IntE n) = IntCE n
-genExpr (_, gSet) (VarE name) =
+genExpr (cMap, gSet) (VarE name) =
   let id = getIdent name in
-  if id `sElem` gSet then
-    GVarCE name
-  else
-    LVarCE id
+    if id `sElem` gSet
+    then if id `mElem` cMap
+         then GConstrCE name
+         else GFnCE name
+    else LVarCE id
 genExpr gInfo (AppE e1 e2) =
   AppCE (gen e1) (gen e2)
   where gen = genExpr gInfo

@@ -60,21 +60,33 @@ compileFn (name, params, body) = do
     arity = length params
     clean = [Update arity, Pop arity]
 
+compileList :: (Stack -> CoreExpr -> CState Code) -> Stack -> [CoreExpr] -> CState Code
+compileList comp st es = go st (reverse es)
+  where
+    go :: Stack -> [CoreExpr] -> CState Code
+    go st [] = return []
+    go st [e] = comp st e
+    go st (e : es) = do
+      c <- comp st e
+      cs <- go (push st 1) es
+      return (c ++ cs)
+
 -- eval expr to WHNF on stack
 compileWHNF :: Stack -> CoreExpr -> CState Code
 compileWHNF _ (IntCE n) =
   return [PushI n]
-compileWHNF st (HNFCE constr params) = do
-  error ""
+compileWHNF st (HNFCE (name, arity, tag) params) = do
+  paramC <- compileList compileLazy st params
+  return (paramC ++ [Pack tag arity])
 compileWHNF st (CaseCE e brs) = do
   eCode <- compileWHNF st e
   brCodes <- traverse (compileBranch st) brs
   return $ eCode ++ [CaseJ brCodes]
-compileWHNF st e@(AppCE (GVarCE op) opr)
+compileWHNF st e@(AppCE (GFnCE op) opr)
   | getIdent op `mElem` prim1 = do
       code <- compileWHNF st opr
       return $ code ++ [prim1 ! getIdent op]
-compileWHNF st e@(AppCE (AppCE (GVarCE op) opr1) opr2)
+compileWHNF st e@(AppCE (AppCE (GFnCE op) opr1) opr2)
   | getIdent op `mElem` prim2 = do
       code2 <- compileWHNF st opr2
       code1 <- compileWHNF (push st 1) opr1
@@ -97,7 +109,9 @@ compileWHNF st e = do
 
 -- create a thunk on stack
 compileLazy :: Stack -> CoreExpr -> CState Code
-compileLazy _ (GVarCE name) =
+compileLazy _ (GFnCE name) =
+  return [PushG name]
+compileLazy _ (GConstrCE name) =
   return [PushG name]
 compileLazy _ (LiftedFn id) =
   return [PushL id]
@@ -105,8 +119,9 @@ compileLazy st (LVarCE i) =
   return [Push (getOffset st i)]
 compileLazy _ (IntCE n) =
   return [PushI n]
-compileLazy st (HNFCE constr params) = do
-  error ""
+compileLazy st (HNFCE (name, arity, tag) params) = do
+  paramC <- compileList compileLazy st params
+  return (paramC ++ [Pack tag arity])
 compileLazy st (AppCE e1 e2) = do
   code2 <- compileLazy st e2
   code1 <- compileLazy (push st 1) e1
