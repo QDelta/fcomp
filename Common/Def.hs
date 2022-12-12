@@ -4,8 +4,8 @@ type RdrName = String
 type Ident = Int
 newtype Name = Name (String, Ident)       -- original name, identifier
 
-getName :: Name -> String
-getName (Name (s, _)) = s
+getRdrName :: Name -> String
+getRdrName (Name (s, _)) = s
 
 getIdent :: Name -> Ident
 getIdent (Name (_, n)) = n

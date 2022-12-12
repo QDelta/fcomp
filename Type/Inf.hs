@@ -76,6 +76,18 @@ newTypeVar = State $
 newTypeVars :: Int -> TState [MType]
 newTypeVars n = traverse (const newTypeVar) (replicate n ())
 
+entryName :: RdrName
+entryName = "start"
+
+entryType :: MType
+entryType = ArrT mIntT (DataT "List" [mIntT])
+
+checkEntry :: (Name, MType) -> TState ()
+checkEntry (name, mtype) =
+  if getRdrName name == entryName
+  then unify entryType mtype
+  else return ()
+
 infer :: Program Name -> String
 infer prog =
   (concat . interleave "\n")
@@ -85,7 +97,7 @@ infer prog =
     showData (name, (arity, _)) =
       name ++ " :: " ++ concat (replicate arity "* -> ") ++ "*"
     showVal (name, t) =
-      getName name ++ " : " ++ show t
+      getRdrName name ++ " : " ++ show t
 
 inferProgram :: Program Name -> TState ([DataInfo], [ValInfo])
 inferProgram (dataGrps, groups) = do
@@ -152,6 +164,7 @@ inferGroup (RecVal binds) =
 inferValGroup :: Bind Name -> TState ValInfo
 inferValGroup (name, expr) = do
   (ident, mtype) <- inferValGroupM (name, expr)
+  checkEntry (name, mtype)
   ptype <- generalize mtype
   removeL ident
   bindF (ident, ptype)
@@ -168,6 +181,7 @@ inferRecGroup :: [Bind Name] -> TState [ValInfo]
 inferRecGroup group = do
   (idents, mtypes) <- unzip <$> inferRecGroupM group
   let names = map fst group
+  traverse_ checkEntry (zip names mtypes)
   ptypes <- traverse generalize mtypes
   traverse_ removeL idents
   traverse_ bindF (zip idents ptypes)
@@ -204,7 +218,7 @@ inferExpr (VarE name) = do
           maybec <- getC lookup
           case maybec of
             Just t -> instantiate t
-            Nothing -> typeError $ "undefined name " ++ getName name
+            Nothing -> typeError $ "undefined name " ++ getRdrName name
 inferExpr (AppE l r) = do
   lt <- inferExpr l
   rt <- inferExpr r
@@ -240,7 +254,7 @@ inferBr (constr, params, body) = do
   maybep <- getC (mLookup (getIdent constr))
   cTypeP <- case maybep of
     Just t -> return t
-    Nothing -> typeError $ "undefined constructor " ++ getName constr
+    Nothing -> typeError $ "undefined constructor " ++ getRdrName constr
   cType <- instantiate cTypeP
   let paramIdents = map getIdent params
   let (paramTypes, patType) = paramBind paramIdents cType

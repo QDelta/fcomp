@@ -429,10 +429,10 @@ int main(void) {
     while (PEEK(node_ptr_t)->tag != 0) {
         print_head(",%ld");
     }
-    printf("\n\n");
+    fflush(stdout);
 
     clock_t prog_end_clock = clock();
-    fprintf(stderr, "Execution time: %.2f ms\n", 1000.0 * (prog_end_clock - prog_start_clock) / CLOCKS_PER_SEC);
+    fprintf(stderr, "\n\nExecution time: %.2f ms\n", 1000.0 * (prog_end_clock - prog_start_clock) / CLOCKS_PER_SEC);
     print_stat();
 
     return 0;

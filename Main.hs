@@ -25,7 +25,7 @@ main = do
   rtCode <- readFile runtime
 
   let prog = (rename . parse) progText
-  let progCode = (codeGen . optGM . compile . optCore . genCore) prog
   putStrLn $ infer prog
+  let progCode = (codeGen . optGM . compile . optCore . genCore) prog
 
   writeFile dstFile (rtCode ++ progCode)
