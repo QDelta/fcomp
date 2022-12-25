@@ -1,0 +1,26 @@
+cabal-version:      2.4
+name:               fcomp
+version:            0.1.0
+
+author:             qdelta
+
+extra-source-files:
+    README.md
+
+executable fcomp
+    main-is:          Main.hs
+
+    other-modules:
+        Utils.Function, Utils.Set, Utils.Map, Utils.Env,
+        Utils.Parsec, Utils.State,
+        Common.Def, Common.AST,
+        Parser.Lexer, Parser.Parser, Parser.Parse, Parser.Renamer,
+        Type.Def, Type.Inf,
+        Core.Def, Core.Gen, Core.Optimize,
+        GM.Def, GM.Compile, GM.Optimize,
+        CodeGen.CGen,
+        Prim.Name, Prim.Type, Prim.Core, Prim.GM
+
+    build-depends:    base, containers
+    hs-source-dirs:   app
+    default-language: Haskell2010

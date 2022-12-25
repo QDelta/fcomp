@@ -1,10 +1,12 @@
 module Parser.Lexer (tlex) where
 
+import Data.Char (ord)
 import Parser.Parser (Token(..))
 
 tlex :: String -> [Token]
 tlex s = case s of
   [] -> []
+  '\'' : c : '\'' : cs -> IntTok (ord c) : tlex cs
   c : cs
     | isSpace c -> tlex cs
     | isDigit c -> callLex intLex

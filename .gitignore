@@ -1,3 +1,4 @@
 .vscode/
-build/*
+build/
+dist-newstyle/
 Makefile.config

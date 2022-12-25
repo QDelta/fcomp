@@ -13,13 +13,9 @@ import CodeGen.CGen
 runtime :: FilePath
 runtime = "vm.c"
 
-defaultDstFile :: FilePath
-defaultDstFile = "build/main.c"
-
 main :: IO ()
 main = do
-  srcFile : restArgs <- getArgs
-  let dstFile = case restArgs of { [] -> defaultDstFile; h : _ -> h }
+  srcFile : dstFile : restArgs <- getArgs
 
   progText <- readFile srcFile
   rtCode <- readFile runtime

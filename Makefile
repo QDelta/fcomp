@@ -1,24 +1,20 @@
 -include Makefile.config
 
-GHC  ?= ghc
-ODIR ?= build
-CC   ?= gcc -O2
+CC     ?= gcc
+CFLAGS ?= -O2
 
-all: fcomp
+TMP_DIR ?= build
 
-fcomp: $(ODIR)
-	$(GHC) --make -O Main.hs -outputdir $(ODIR) -o $(ODIR)/fcomp
+$(TMP_DIR):
+	mkdir $(TMP_DIR)
 
-$(ODIR):
-	mkdir $(ODIR)
-
-test: fcomp
-	$(ODIR)/fcomp $(SRC) $(ODIR)/main.c
+test: $(TMP_DIR)
+	cabal run fcomp -- $(SRC) $(TMP_DIR)/main.c
 	@echo
-	@$(CC) $(ODIR)/main.c -o $(ODIR)/main
-	@echo $(INPUT) | $(ODIR)/main
+	@$(CC) $(CFLAGS) $(TMP_DIR)/main.c -o $(TMP_DIR)/main
+	@echo $(INPUT) | $(TMP_DIR)/main
 
 clean:
-	rm -r $(ODIR)
+	rm -rf $(TMP_DIR)
 
-.PHONY: fcomp test clean
+.PHONY: test clean
