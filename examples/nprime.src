@@ -1,19 +1,19 @@
-fn ifte b x y =
-  match b with
-  | True  -> x
-  | False -> y
-
 rec fn filter f l =
   match l with
   | Nil -> Nil
   | Cons h t ->
       let rest = filter f t in
-      ifte (f h) (Cons h rest) rest
+        match f h with
+        | True  -> Cons h rest
+        | False -> rest
 
 rec fn take n l =
   match l with
   | Nil -> Nil
-  | Cons h t -> ifte (eq 0 n) Nil (Cons h (take (sub n 1) t))
+  | Cons h t ->
+      match eq 0 n with
+      | True  -> Nil
+      | False -> Cons h (take (sub n 1) t)
 
 val primes =
   let rec from n =

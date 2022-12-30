@@ -1,8 +1,3 @@
-fn ifte b x y =
-  match b with
-  | True  -> x
-  | False -> y
-
 rec fn foldl f x l =
   match l with
   | Nil -> x
@@ -23,7 +18,9 @@ rec fn filter f l =
   | Nil -> Nil
   | Cons h t ->
       let rest = filter f t in
-      ifte (f h) (Cons h rest) rest
+        match f h with
+        | True  -> Cons h rest
+        | False -> rest
 
 rec fn length l =
   match l with
@@ -40,14 +37,15 @@ fn concat = foldr append Nil
 fn concatMap f l = concat (map f l)
 
 rec fn fromTo m n =
-  ifte (gt m n) Nil (Cons m (fromTo (add m 1) n))
+  match gt m n with
+  | True  -> Nil
+  | False -> Cons m (fromTo (add m 1) n)
 
 fn queens n =
   let rec loop boards counter =
-    ifte
-      (eq counter n)
-      boards
-      (loop (concatMap expand boards) (add counter 1))
+    match eq counter n with
+    | True  -> boards
+    | False -> loop (concatMap expand boards) (add counter 1)
   with expand board =
     map
       (\x -> Cons x board)
