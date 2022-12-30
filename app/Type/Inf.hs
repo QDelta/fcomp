@@ -101,7 +101,6 @@ infer prog =
 
 inferProgram :: Program Name -> TState ([DataInfo], [ValInfo])
 inferProgram (dataGrps, groups) = do
-  -- dataInfos <- traverse constructData dataDefs
   dataInfoLs <- traverse inferDataGroup dataGrps
   valInfoLs <- traverse inferGroup groups
   return (concat dataInfoLs, concat valInfoLs)

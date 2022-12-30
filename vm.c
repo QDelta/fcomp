@@ -410,10 +410,32 @@ void print_stat() {
     fprintf(stderr, "Maximum heap usage: %lld bytes\n", stat_max_heap_size);
 }
 
-int main(void) {
+int main() {
     clock_t prog_start_clock = clock();
 
     global_init();
+
+    // inst_pack(0, 0);
+    // i64_t c = fgetc(stdin);
+    // while (c != EOF) {
+    //     inst_pushi(c);
+    //     inst_pack(1, 2);
+    //     c = fgetc(stdin);
+    // }
+
+    // inst_pushg(entry_func_offset);
+    // inst_mkapp();
+    // inst_eval();
+
+    // while (PEEK(node_ptr_t)->tag != 0) {
+    //     inst_split();
+    //     inst_eval();
+    //     i64_t head = GET_INT_VAL(PEEK(node_ptr_t));
+    //     fputc(head, stdout);
+    //     POP(node_ptr_t);
+    //     inst_eval();
+    // }
+    // fflush(stdout);
 
     i64_t input;
     scanf("%lld", &input);

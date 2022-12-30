@@ -15,13 +15,16 @@ runtime = "vm.c"
 
 main :: IO ()
 main = do
-  srcFile : dstFile : restArgs <- getArgs
+  args <- getArgs
+  case args of
+    [srcFile, dstFile] -> do
+      progText <- readFile srcFile
+      rtCode <- readFile runtime
 
-  progText <- readFile srcFile
-  rtCode <- readFile runtime
+      let prog = (rename . parse) progText
+      putStrLn $ infer prog
+      let progCode = (codeGen . optGM . compile . optCore . genCore) prog
 
-  let prog = (rename . parse) progText
-  putStrLn $ infer prog
-  let progCode = (codeGen . optGM . compile . optCore . genCore) prog
-
-  writeFile dstFile (rtCode ++ progCode)
+      writeFile dstFile (rtCode ++ progCode)
+    _ -> do
+      putStrLn "Usage: fcomp <source-file> <output-file>"
