@@ -44,8 +44,8 @@ compilePrimFn arity (name, inst) =
 --  or x y = case x of { True -> True; False -> y };
 compiledPrimFns :: [(Name, Int, Code)]
 compiledPrimFns =
-  [ (primNameMap ! "and", 2, [Push 0, Eval, CaseJ [(0, [Pop 1, Pack 0 0]), (1, [Pop 1, Push 1, Eval])], Update 2, Pop 2])
-  , (primNameMap ! "or",  2, [Push 0, Eval, CaseJ [(0, [Pop 1, Push 1, Eval]), (1, [Pop 1, Pack 1 0])], Update 2, Pop 2])
+  [ (primNameMap ! "and", 2, [Push 0, Eval, CaseJ [(0, [Pop 1, pack 0 0]), (1, [Pop 1, Push 1, Eval])], Update 2, Pop 2])
+  , (primNameMap ! "or",  2, [Push 0, Eval, CaseJ [(0, [Pop 1, Push 1, Eval]), (1, [Pop 1, pack 1 0])], Update 2, Pop 2])
   ]
   ++ map (compilePrimFn 2) prim2Insts
   ++ map (compilePrimFn 1) prim1Insts

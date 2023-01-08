@@ -128,9 +128,9 @@ genInstr IsLe =
 genInstr Not =
   "inst_not();\n"
 genInstr (CaseJ brs) =
-  "switch (PEEK(node_ptr_t)->tag) {\n" ++
+  "switch (tagof(PEEK(node_ptr_t))) {\n" ++
   concatMap genCase brs ++
-  "default: fputs(\"Non-exhaustive pattern!\\n\", stderr); exit(1);\n" ++
+  "default: fprintf(stderr, \"Non-exhaustive pattern at line %d, tag %lld\\n\", __LINE__, tagof(PEEK(node_ptr_t))); exit(1);\n" ++
   "};\n"
 
 genCase :: (Int, [Instruction]) -> CCode

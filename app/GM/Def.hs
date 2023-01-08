@@ -22,6 +22,9 @@ data Instruction
   | Not
   deriving (Show)
 
+pack :: Int -> Int -> Instruction
+pack tag arity = if arity == 0 then PushI tag else Pack tag arity
+
 data Node
   = NApp Addr Addr
   | NGlobal Int Code

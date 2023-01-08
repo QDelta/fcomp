@@ -77,7 +77,7 @@ compileWHNF _ (IntCE n) =
   return [PushI n]
 compileWHNF st (HNFCE (name, arity, tag) params) = do
   paramC <- compileList compileLazy st params
-  return (paramC ++ [Pack tag arity])
+  return (paramC ++ [pack tag arity])
 compileWHNF st (CaseCE e brs) = do
   eCode <- compileWHNF st e
   brCodes <- traverse (compileBranch st) brs
@@ -121,7 +121,7 @@ compileLazy _ (IntCE n) =
   return [PushI n]
 compileLazy st (HNFCE (name, arity, tag) params) = do
   paramC <- compileList compileLazy st params
-  return (paramC ++ [Pack tag arity])
+  return (paramC ++ [pack tag arity])
 compileLazy st (AppCE e1 e2) = do
   code2 <- compileLazy st e2
   code1 <- compileLazy (push st 1) e1
@@ -175,7 +175,7 @@ compileBranch st (tag, binds, body) = do
 
 compileConstr :: CoreConstr -> CompiledCoreConstr
 compileConstr (name, arity, tag) =
-  (name, arity, tag, [Pack tag arity, Update 0])
+  (name, arity, tag, [pack tag arity, Update 0])
 
 compile :: CoreProgram -> CompiledCore
 compile (cs, fs) =

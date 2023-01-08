@@ -6,6 +6,6 @@ rec fn take n l =
       | True  -> Nil
       | False -> Cons h (take (sub n 1) t)
 
-rec fn fix f = let rec x = f x in x
+fn fix f = let rec x = f x in x
 
 fn start n = take n (fix (Cons n))

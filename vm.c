@@ -275,10 +275,12 @@ void inst_pack(i64_t tag, i64_t arity) {
 
 void inst_split(void) {
     node_ptr_t p = PEEK(node_ptr_t);
-    i64_t d_arity = p->d_arity;
     POP(node_ptr_t);
-    for (i64_t i = d_arity - 1; i >= 0; --i) {
-        PUSH(node_ptr_t, p->d_params[i]);
+    if (! IS_INT_NODE(p)) {
+        i64_t d_arity = p->d_arity;
+        for (i64_t i = d_arity - 1; i >= 0; --i) {
+            PUSH(node_ptr_t, p->d_params[i]);
+        }
     }
 }
 
@@ -352,7 +354,7 @@ void inst_alloc(i64_t n) {
     do { \
         node_ptr_t p0 = PEEK_OFFSET(node_ptr_t, 0); \
         node_ptr_t p1 = PEEK_OFFSET(node_ptr_t, 1); \
-        node_ptr_t p = INT_NODE(GET_INT_VAL(p0) op GET_INT_VAL(p1)); \
+        node_ptr_t p = INT_NODE((i64_t)(GET_INT_VAL(p0) op GET_INT_VAL(p1))); \
         POP_N(node_ptr_t, 2); \
         PUSH(node_ptr_t, p); \
     } while (0) \
@@ -362,34 +364,22 @@ void inst_sub(void) { INST_INT_ARITH_BINOP(-); }
 void inst_mul(void) { INST_INT_ARITH_BINOP(*); }
 void inst_div(void) { INST_INT_ARITH_BINOP(/); }
 void inst_rem(void) { INST_INT_ARITH_BINOP(%); }
-
-#define INST_INT_CMP_BINOP(op) \
-    do { \
-        node_ptr_t p = node_alloc(0); \
-        node_ptr_t p0 = PEEK_OFFSET(node_ptr_t, 0); \
-        node_ptr_t p1 = PEEK_OFFSET(node_ptr_t, 1); \
-        p->type = NDATA; \
-        p->tag = GET_INT_VAL(p0) op GET_INT_VAL(p1) ? 1 : 0; \
-        p->d_arity = 0; \
-        POP_N(node_ptr_t, 2); \
-        PUSH(node_ptr_t, p); \
-    } while (0)
-
-void inst_iseq(void) { INST_INT_CMP_BINOP(==); }
-void inst_isgt(void) { INST_INT_CMP_BINOP(>); }
-void inst_islt(void) { INST_INT_CMP_BINOP(<); }
-void inst_isne(void) { INST_INT_CMP_BINOP(!=); }
-void inst_isge(void) { INST_INT_CMP_BINOP(>=); }
-void inst_isle(void) { INST_INT_CMP_BINOP(<=); }
+void inst_iseq(void) { INST_INT_ARITH_BINOP(==); }
+void inst_isgt(void) { INST_INT_ARITH_BINOP(>); }
+void inst_islt(void) { INST_INT_ARITH_BINOP(<); }
+void inst_isne(void) { INST_INT_ARITH_BINOP(!=); }
+void inst_isge(void) { INST_INT_ARITH_BINOP(>=); }
+void inst_isle(void) { INST_INT_ARITH_BINOP(<=); }
 
 void inst_not(void) {
-    node_ptr_t p = node_alloc(0);
     node_ptr_t p0 = PEEK(node_ptr_t);
-    p->type = NDATA;
-    p->tag = (! p0->tag) ? 1 : 0;
-    p->d_arity = 0;
+    node_ptr_t p = INT_NODE((i64_t)(GET_INT_VAL(p) ? 1 : 0));
     POP(node_ptr_t);
     PUSH(node_ptr_t, p);
+}
+
+i64_t tagof(node_ptr_t p) {
+    return IS_INT_NODE(p) ? GET_INT_VAL(p) : p->tag;
 }
 
 i64_t entry_func_offset;
@@ -415,7 +405,7 @@ int main() {
 
     global_init();
 
-    // inst_pack(0, 0);
+    // inst_pushi(0); // Nil
     // i64_t c = fgetc(stdin);
     // while (c != EOF) {
     //     inst_pushi(c);
@@ -427,7 +417,7 @@ int main() {
     // inst_mkapp();
     // inst_eval();
 
-    // while (PEEK(node_ptr_t)->tag != 0) {
+    // while (tagof(PEEK(node_ptr_t)) != 0) {
     //     inst_split();
     //     inst_eval();
     //     i64_t head = GET_INT_VAL(PEEK(node_ptr_t));
@@ -445,10 +435,10 @@ int main() {
     inst_mkapp();
     inst_eval();
 
-    if (PEEK(node_ptr_t)->tag != 0) {
+    if (tagof(PEEK(node_ptr_t)) != 0) {
         print_head("%ld");
     }
-    while (PEEK(node_ptr_t)->tag != 0) {
+    while (tagof(PEEK(node_ptr_t)) != 0) {
         print_head(",%ld");
     }
     fflush(stdout);
