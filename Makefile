@@ -1,7 +1,7 @@
 -include Makefile.config
 
 CC     ?= gcc
-CFLAGS ?= -O2
+CFLAGS ?= -Wall -O2
 
 TMP_DIR ?= build
 

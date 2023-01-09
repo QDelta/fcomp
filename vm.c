@@ -373,7 +373,7 @@ void inst_isle(void) { INST_INT_ARITH_BINOP(<=); }
 
 void inst_not(void) {
     node_ptr_t p0 = PEEK(node_ptr_t);
-    node_ptr_t p = INT_NODE((i64_t)(GET_INT_VAL(p) ? 1 : 0));
+    node_ptr_t p = INT_NODE((i64_t)(! GET_INT_VAL(p0)));
     POP(node_ptr_t);
     PUSH(node_ptr_t, p);
 }
