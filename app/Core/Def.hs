@@ -1,6 +1,7 @@
 module Core.Def where
 
-import Utils.Set
+import qualified Data.Set as S
+
 import Common.Def
 
 -- Core is not strongly typed
@@ -25,43 +26,43 @@ type CoreFn = (Name, [Ident], CoreExpr)    -- name, params, body
 
 type CoreProgram = ([CoreConstr], [CoreFn])
 
-localVarsExcept :: Set Ident -> CoreExpr -> Set Ident
-localVarsExcept _ (GFnCE _) = emptySet
-localVarsExcept _ (GConstrCE _) = emptySet
-localVarsExcept _ (LiftedFn _) = emptySet
-localVarsExcept _ (IntCE _) = emptySet
+localVarsExcept :: S.Set Ident -> CoreExpr -> S.Set Ident
+localVarsExcept _ (GFnCE _) = S.empty
+localVarsExcept _ (GConstrCE _) = S.empty
+localVarsExcept _ (LiftedFn _) = S.empty
+localVarsExcept _ (IntCE _) = S.empty
 
 localVarsExcept eSet (LVarCE id) =
-  if id `sElem` eSet then emptySet else sSingleton id
+  if id `S.member` eSet then S.empty else S.singleton id
 
 localVarsExcept eSet (HNFCE c es) =
-  foldl sUnion emptySet (map (localVarsExcept eSet) es)
+  foldl S.union S.empty (map (localVarsExcept eSet) es)
 
 localVarsExcept eSet (AppCE e1 e2) =
-  locals e1 `sUnion` locals e2
+  locals e1 `S.union` locals e2
   where locals = localVarsExcept eSet
 
 localVarsExcept eSet (CaseCE e brs) =
-  foldl sUnion (localVarsExcept eSet e) (map localsBr brs)
+  foldl S.union (localVarsExcept eSet e) (map localsBr brs)
   where
     localsBr (_, brBinds, body) =
-      let newESet = foldl sInsert eSet brBinds
+      let newESet = foldl (flip S.insert) eSet brBinds
        in localVarsExcept newESet body
 
 localVarsExcept eSet (LetCE b e) =
   let (bindId, bindExpr) = b
-      newESet = sInsert eSet bindId
-   in localVarsExcept eSet bindExpr `sUnion`
+      newESet = S.insert bindId eSet
+   in localVarsExcept eSet bindExpr `S.union`
       localVarsExcept newESet e
 
 localVarsExcept eSet (LetRecCE bs e) =
   let locals = localVarsExcept newESet
       (bindIds, bindExprs) = unzip bs
-      newESet = foldl sInsert eSet bindIds
-   in foldl sUnion (locals e) (map locals bindExprs)
+      newESet = foldl (flip S.insert) eSet bindIds
+   in foldl S.union (locals e) (map locals bindExprs)
 
 localVarsExcept eSet (LambdaCE ps e) =
-  localVarsExcept (foldl sInsert eSet ps) e
+  localVarsExcept (foldl (flip S.insert) eSet ps) e
 
 replaceLocal :: Ident -> CoreExpr -> CoreExpr -> CoreExpr
 replaceLocal id replE e = case e of

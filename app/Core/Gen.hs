@@ -1,8 +1,8 @@
 module Core.Gen (genCore) where
 
-import Utils.Function
-import Utils.Map
-import Utils.Set
+import qualified Data.Map as M
+import qualified Data.Set as S
+
 import Common.Def
 import Common.AST
 import Type.Inf
@@ -10,7 +10,7 @@ import Core.Def
 import Prim.Name
 import Prim.Core
 
-type GlobalInfo = (Map Ident Int, Set Ident) -- constructor tag, global name
+type GlobalInfo = (M.Map Ident Int, S.Set Ident) -- constructor tag, global name
 
 genCore :: Program Name -> CoreProgram
 genCore (dataGroups, valGroups) =
@@ -21,18 +21,18 @@ genCore (dataGroups, valGroups) =
     defDataBinds = concatMap (\(RecData l) -> l) dataGroups
     cMap = genConstrInfo coreConstrs
     defValBinds = concatMap getValBinds valGroups
-    gSet = genGIdents defValBinds defConstrs `sUnion` primIdents
+    gSet = genGIdents defValBinds defConstrs `S.union` primIdents
     gInfo = (cMap, gSet)
     coreFns = map (genFn gInfo) defValBinds
 
-genConstrInfo :: [CoreConstr] -> Map Ident Int
+genConstrInfo :: [CoreConstr] -> M.Map Ident Int
 genConstrInfo =
-  foldl (\m (n, a, t) -> mInsert (getIdent n, t) m) emptyMap
+  foldl (\m (n, a, t) -> M.insert (getIdent n) t m) M.empty
 
-genGIdents :: [Bind Name] -> [CoreConstr] -> Set Ident
+genGIdents :: [Bind Name] -> [CoreConstr] -> S.Set Ident
 genGIdents fnDefs constrs =
-           foldl (\s (n, _) -> sInsert s (getIdent n)) emptySet fnDefs
-  `sUnion` foldl (\s (n, _, _) -> sInsert s (getIdent n)) emptySet constrs
+            foldl (\s (n, _) -> S.insert (getIdent n) s) S.empty fnDefs
+  `S.union` foldl (\s (n, _, _) -> S.insert (getIdent n) s) S.empty constrs
 
 genConstrs :: DataBind Name -> [CoreConstr]
 genConstrs (name, _, constrs) =
@@ -53,8 +53,8 @@ genExpr :: GlobalInfo -> Expr Name -> CoreExpr
 genExpr _ (IntE n) = IntCE n
 genExpr (cMap, gSet) (VarE name) =
   let id = getIdent name in
-    if id `sElem` gSet
-    then if id `mElem` cMap
+    if id `S.member` gSet
+    then if id `M.member` cMap
          then GConstrCE name
          else GFnCE name
     else LVarCE id
@@ -80,14 +80,14 @@ genBranch :: GlobalInfo -> Branch Name -> CoreBranch
 genBranch gInfo@(cMap, _) (name, binds, e) =
   (tag, map getIdent binds, genExpr gInfo e)
   where
-    tag = cMap ! getIdent name
+    tag = cMap M.! getIdent name
 
 primConstrs :: [CoreConstr]
 primConstrs =
   map
     (\(s, arity, tag) ->
-      (primNameMap ! s, arity, tag))
+      (primNameMap M.! s, arity, tag))
     primCoreConstrs
 
-primIdents :: Set Ident
-primIdents = sFromList (enumFromTo minPrimIdent maxPrimIdent)
+primIdents :: S.Set Ident
+primIdents = S.fromList (enumFromTo minPrimIdent maxPrimIdent)

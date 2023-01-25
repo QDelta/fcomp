@@ -1,12 +1,13 @@
 module GM.Def where
 
-import Utils.Map
+import qualified Data.Map as M
+
 import Common.Def
 
 data Instruction
   = PushG  Name  -- global
   | PushL  Ident -- lifted
-  | PushI  Int   -- boxed int
+  | PushI  Int   -- integer
   | Push   Int
   | Pop    Int
   | MkApp
@@ -25,14 +26,6 @@ data Instruction
 pack :: Int -> Int -> Instruction
 pack tag arity = if arity == 0 then PushI tag else Pack tag arity
 
-data Node
-  = NApp Addr Addr
-  | NGlobal Int Code
-  | NInd Addr
-  | NData Int [Addr]
-  | NInt Int
-  deriving (Show)
-
 type Addr = Int
 type Code = [Instruction]
-type GlobalMap = Map String Addr
+type GlobalMap = M.Map String Addr

@@ -1,16 +1,17 @@
 module Core.Optimize (optCore) where
 
-import Utils.Map
+import qualified Data.Map as M
+
 import Common.Def
 import Core.Def
 
-type ConstrMap = Map Ident (Int, Int)
+type ConstrMap = M.Map Ident (Int, Int)
 
 optCore :: CoreProgram -> CoreProgram
 optCore (constrs, fns) =
   (constrs, map (optFn cMap) fns)
   where
-    cMap = mFromList $ map
+    cMap = M.fromList $ map
       (\(name, arity, tag) -> (getIdent name, (arity, tag)))
       constrs
 
@@ -24,7 +25,7 @@ optExpr = hnfExpr
 hnfExpr :: ConstrMap -> CoreExpr -> CoreExpr
 hnfExpr cMap e = case e of
   GConstrCE name ->
-    let (arity, tag) = cMap ! getIdent name
+    let (arity, tag) = cMap M.! getIdent name
      in if arity == 0
         then HNFCE (name, arity, tag) []
         else e
@@ -44,7 +45,7 @@ hnfExpr cMap e = case e of
 hnfApp :: ConstrMap -> CoreExpr -> CoreExpr -> Maybe CoreExpr
 hnfApp cMap f last = case appToList f of
   GConstrCE name : es ->
-    let (arity, tag) = cMap ! getIdent name
+    let (arity, tag) = cMap M.! getIdent name
      in if arity == 1 + length es
         then Just $ HNFCE (name, arity, tag) (es ++ [last])
         else Nothing

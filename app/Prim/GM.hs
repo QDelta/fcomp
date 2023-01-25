@@ -1,6 +1,7 @@
 module Prim.GM where
 
-import Utils.Map
+import qualified Data.Map as M
+
 import Common.Def
 import GM.Def
 import Prim.Name
@@ -37,15 +38,15 @@ prim1Insts = primBool1Insts
 
 compilePrimFn :: Int -> (String, Instruction) -> (Name, Int, Code)
 compilePrimFn arity (name, inst) =
-  (primNameMap ! name, arity,
+  (primNameMap M.! name, arity,
     concat (replicate arity [Push (arity - 1), Eval]) ++ [inst, Update arity, Pop arity])
 
 -- and x y = case x of { False -> False; True -> y };
 --  or x y = case x of { True -> True; False -> y };
 compiledPrimFns :: [(Name, Int, Code)]
 compiledPrimFns =
-  [ (primNameMap ! "and", 2, [Push 0, Eval, CaseJ [(0, [Pop 1, pack 0 0]), (1, [Pop 1, Push 1, Eval])], Update 2, Pop 2])
-  , (primNameMap ! "or",  2, [Push 0, Eval, CaseJ [(0, [Pop 1, Push 1, Eval]), (1, [Pop 1, pack 1 0])], Update 2, Pop 2])
+  [ (primNameMap M.! "and", 2, [Push 0, Eval, CaseJ [(0, [Pop 1, pack 0 0]), (1, [Pop 1, Push 1, Eval])], Update 2, Pop 2])
+  , (primNameMap M.! "or",  2, [Push 0, Eval, CaseJ [(0, [Pop 1, Push 1, Eval]), (1, [Pop 1, pack 1 0])], Update 2, Pop 2])
   ]
   ++ map (compilePrimFn 2) prim2Insts
   ++ map (compilePrimFn 1) prim1Insts

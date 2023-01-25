@@ -1,9 +1,7 @@
 {-# LANGUAGE TupleSections #-}
 
 module Utils.State
-  ( State(..)
-  , execState
-  , evalState
+  ( State(..) , execState , evalState
   ) where
 
 import Utils.Function
@@ -18,17 +16,16 @@ evalState s = fst . runState s
 
 instance Monad (State s) where
   return = pure
-  (State r1) >>= f = State $
-    \s1 -> let
-      (x, s2) = r1 s1
-      State r2 = f x
-    in r2 s2
+  (>>=) (State r1) f = State $
+    \s1 -> let (x, s2) = r1 s1
+               State r2 = f x
+            in r2 s2
 
 instance Functor (State s) where
   fmap f (State r) = State (first f . r)
 
 instance Applicative (State s) where
   pure x = State (x,)
-  sab <*> sa = do
-    fab <- sab
-    fab <$> sa
+  sab <*> sa =
+    do fab <- sab
+       fab <$> sa

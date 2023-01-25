@@ -2,7 +2,7 @@ module Common.Def where
 
 type RdrName = String
 type Ident = Int
-newtype Name = Name (String, Ident)       -- original name, identifier
+newtype Name = Name (String, Ident) -- original name, identifier
 
 getRdrName :: Name -> String
 getRdrName (Name (s, _)) = s

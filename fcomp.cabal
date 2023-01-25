@@ -11,7 +11,7 @@ executable fcomp
     main-is:          Main.hs
 
     other-modules:
-        Utils.Function, Utils.Set, Utils.Map, Utils.Env,
+        Utils.Function, Utils.Env,
         Utils.Parsec, Utils.State,
         Common.Def, Common.AST,
         Parser.Lexer, Parser.Parser, Parser.Parse, Parser.Renamer,

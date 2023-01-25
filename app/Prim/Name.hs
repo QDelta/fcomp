@@ -1,7 +1,8 @@
 module Prim.Name where
 
+import qualified Data.Map as M
+
 import Common.Def
-import Utils.Map
 
 primNames :: [(RdrName, Name)]
 primNames =
@@ -25,11 +26,11 @@ primNames =
   , ("Cons",  Name ("Cons",  17))
   ]
 
-primNameMap :: Map RdrName Name
-primNameMap = mFromList primNames
+primNameMap :: M.Map RdrName Name
+primNameMap = M.fromList primNames
 
-primBranchNum :: Map Ident Int
-primBranchNum = mFromList
+primBranchNum :: M.Map Ident Int
+primBranchNum = M.fromList
   [ (14, 2)
   , (15, 2)
   , (16, 2)

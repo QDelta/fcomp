@@ -1,6 +1,5 @@
 module Common.AST where
 
-import Utils.Function
 import Common.Def
 
 data Expr v
@@ -47,7 +46,7 @@ getValNames (ValDef val) = [fst val]
 getValNames (RecVal vals) = map fst vals
 
 getDataNames :: DataGroup v -> [RdrName]
-getDataNames (RecData datas) = map fst3 datas
+getDataNames (RecData datas) = map (\(a, b, c) -> a) datas
 
 getConstrNames :: DataGroup v -> [v]
-getConstrNames (RecData datas) = map fst (concatMap trd3 datas)
+getConstrNames (RecData datas) = map fst (concatMap (\(a, b, c) -> c) datas)

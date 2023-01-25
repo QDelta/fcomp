@@ -1,9 +1,6 @@
 module Type.Def
   ( MType(..), PType(..)
-  , DataAttr
   ) where
-
-import Utils.Set
 
 data MType
   = VarT Int
@@ -11,10 +8,7 @@ data MType
   | ArrT MType MType
   deriving (Eq)
 
-data PType = Forall (Set Int) MType
-
-type DataAttr = (Int, Bool) -- number of type parameters, is number type
--- data type with only constant constructors can be translate to integers
+data PType = Forall [Int] MType
 
 data TyPrec = Open | Arrow | App
 
@@ -43,7 +37,6 @@ instance Show MType where
 
 instance Show PType where
   show (Forall ps t) =
-    (if sIsEmpty ps then "" else tparamStr) ++ show t
+    (if null ps then "" else tparamStr) ++ show t
     where
-      tparamStr =
-        "forall" ++ concatMap (\p -> " t" ++ show p) (sToList ps) ++ ". "
+      tparamStr = "forall" ++ concatMap (\p -> " t" ++ show p) ps ++ ". "

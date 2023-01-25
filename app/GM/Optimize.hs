@@ -1,8 +1,8 @@
 module GM.Optimize (optGM) where
 
+import Utils.Function
 import GM.Def
 import GM.Compile
-import Utils.Function
 
 optGM :: CompiledCore -> CompiledCore
 optGM (constrs, fns, lfns) =
