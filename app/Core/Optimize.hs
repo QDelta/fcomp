@@ -28,13 +28,13 @@ hnfExpr cMap e =
     GConstrCE name ->
       let (arity, tag) = cMap M.! getIdent name
       in if arity == 0
-          then HNFCE (name, arity, tag) []
+          then CTorCE (name, arity, tag) []
           else e
     AppCE e1 e2 ->
       case hnfApp cMap e1 e2 of
         Just e -> e
         Nothing -> AppCE (hnfExpr cMap e1) (hnfExpr cMap e2)
-    HNFCE c es -> HNFCE c (map (hnfExpr cMap) es)
+    CTorCE c es -> CTorCE c (map (hnfExpr cMap) es)
     CaseCE e brs -> CaseCE (hnfExpr cMap e) (map hnfBr brs)
     LetCE bind e -> LetCE (hnfBind bind) (hnfExpr cMap e)
     LetRecCE binds e -> LetRecCE (map hnfBind binds) (hnfExpr cMap e)
@@ -50,7 +50,7 @@ hnfApp cMap f last =
     GConstrCE name : es ->
       let (arity, tag) = cMap M.! getIdent name
       in if arity == 1 + length es
-          then Just $ HNFCE (name, arity, tag) (es ++ [last])
+          then Just $ CTorCE (name, arity, tag) (es ++ [last])
           else Nothing
     _ -> Nothing
   where

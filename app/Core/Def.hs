@@ -11,7 +11,7 @@ data CoreExpr
   | LiftedFn Ident
   | LVarCE Ident
   | IntCE  Int
-  | HNFCE CoreConstr [CoreExpr]        -- saturated constructor
+  | CTorCE CoreConstr [CoreExpr]       -- saturated constructor
   | AppCE CoreExpr CoreExpr
   | CaseCE CoreExpr [CoreBranch]
   | LetCE CoreBind CoreExpr            -- bind, expression
@@ -35,7 +35,7 @@ localVarsExcept _ (IntCE _) = S.empty
 localVarsExcept eSet (LVarCE id) =
   if id `S.member` eSet then S.empty else S.singleton id
 
-localVarsExcept eSet (HNFCE c es) =
+localVarsExcept eSet (CTorCE c es) =
   foldl S.union S.empty (map (localVarsExcept eSet) es)
 
 localVarsExcept eSet (AppCE e1 e2) =
@@ -68,7 +68,7 @@ replaceLocal :: Ident -> CoreExpr -> CoreExpr -> CoreExpr
 replaceLocal id replE e =
   case e of
     LVarCE id' | id == id' -> replE
-    HNFCE c es -> HNFCE c (map replace es)
+    CTorCE c es -> CTorCE c (map replace es)
     AppCE e1 e2 -> AppCE (replace e1) (replace e2)
     CaseCE e brs -> CaseCE (replace e) (map replaceBr brs)
     LetCE bind e -> LetCE (replaceBind bind) (replace e)

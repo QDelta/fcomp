@@ -78,7 +78,7 @@ compileList comp st es = go st (reverse es)
 compileWHNF :: GMCompiler CoreExpr
 compileWHNF _ (IntCE n) =
   return [PushI n]
-compileWHNF st (HNFCE (name, arity, tag) params) =
+compileWHNF st (CTorCE (name, arity, tag) params) =
   do paramC <- compileList compileLazy st params
      return (paramC ++ [pack tag arity])
 compileWHNF st (CaseCE e brs) =
@@ -126,7 +126,7 @@ compileLazy st (LVarCE i) =
   return [Push (getOffset st i)]
 compileLazy _ (IntCE n) =
   return [PushI n]
-compileLazy st (HNFCE (name, arity, tag) params) =
+compileLazy st (CTorCE (name, arity, tag) params) =
   do paramC <- compileList compileLazy st params
      return (paramC ++ [pack tag arity])
 compileLazy st (AppCE e1 e2) =
