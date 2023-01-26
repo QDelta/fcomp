@@ -305,13 +305,16 @@ instantiate (Forall plist t) =
      return $ substitute (M.fromList $ zip plist tparams) t
 
 substitute :: M.Map Int MType -> MType -> MType
-substitute smap t = case t of
-  VarT p -> case M.lookup p smap of
-    Just t -> t
-    Nothing -> VarT p
-  ArrT l r -> ArrT (subst l) (subst r)
-  DataT n ts -> DataT n (map subst ts)
-  where subst = substitute smap
+substitute smap t =
+  case t of
+    VarT p ->
+      case M.lookup p smap of
+        Just t -> t
+        Nothing -> VarT p
+    ArrT l r -> ArrT (subst l) (subst r)
+    DataT n ts -> DataT n (map subst ts)
+  where
+    subst = substitute smap
 
 unify :: MType -> MType -> TState ()
 unify l r =
@@ -330,10 +333,11 @@ unify l r =
        (lt, rt) -> unifyError lt rt
 
 unifyP :: Int -> MType -> TState ()
-unifyP p t = case t of
-  VarT p1 | p == p1 -> return ()
-  t | occurs p t -> unifyError p t
-    | otherwise -> bindV (p, t)
+unifyP p t =
+  case t of
+    VarT p1 | p == p1 -> return ()
+    t | occurs p t -> unifyError p t
+      | otherwise -> bindV (p, t)
   where
     occurs p (VarT p1) = p == p1
     occurs p (ArrT l r) = occurs p l || occurs p r

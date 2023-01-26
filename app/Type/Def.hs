@@ -13,22 +13,23 @@ data PType = Forall [Int] MType
 data TyPrec = Open | Arrow | App
 
 showPrec :: TyPrec -> MType -> String
-showPrec pr t = case t of
-  VarT n     -> 't' : show n
-  DataT n ts -> showData pr n ts
-  ArrT l r   -> showArr pr l r
+showPrec _  (VarT n) = 't' : show n
+showPrec pr (DataT n ts) = showData pr n ts
+showPrec pr (ArrT l r) = showArr pr l r
 
 showData :: TyPrec -> String -> [MType] -> String
-showData pr n ts = case pr of
-  App | not (null ts) -> "(" ++ s ++ ")"
-  _ -> s
+showData pr n ts =
+  case pr of
+    App | not (null ts) -> "(" ++ s ++ ")"
+    _ -> s
   where
     s = unwords (n : map (showPrec App) ts)
 
 showArr :: TyPrec -> MType -> MType -> String
-showArr pr l r = case pr of
-  Open -> s
-  _   -> "(" ++ s ++ ")"
+showArr pr l r =
+  case pr of
+    Open -> s
+    _   -> "(" ++ s ++ ")"
   where
     s = showPrec Arrow l ++ " -> " ++ showPrec Open r
 

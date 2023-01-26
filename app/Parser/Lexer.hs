@@ -4,15 +4,16 @@ import Data.Char (ord)
 import Parser.Parser (Token(..))
 
 tlex :: String -> [Token]
-tlex s = case s of
-  [] -> []
-  '\'' : c : '\'' : cs -> IntTok (ord c) : tlex cs
-  c : cs
-    | isSpace c -> tlex cs
-    | isDigit c -> callLex intLex
-    | isUpperAlpha c -> callLex (nameLex UNameTok)
-    | isLowerAlpha c -> callLex (nameLex LNameTok)
-    | otherwise -> callLex symLex
+tlex s =
+  case s of
+    [] -> []
+    '\'' : c : '\'' : cs -> IntTok (ord c) : tlex cs
+    c : cs
+      | isSpace c -> tlex cs
+      | isDigit c -> callLex intLex
+      | isUpperAlpha c -> callLex (nameLex UNameTok)
+      | isLowerAlpha c -> callLex (nameLex LNameTok)
+      | otherwise -> callLex symLex
   where
     callLex :: (String -> (Token, String)) -> [Token]
     callLex lexer = toks
@@ -54,17 +55,18 @@ nameLex f s = (tn, rest)
   where
     isNameC c = isAlpha c || isDigit c
     (name, rest) = span isNameC s
-    tn = case name of
-      "data"  -> DataKW
-      "match" -> MatchKW
-      "with"  -> WithKW
-      "end"   -> EndKW
-      "val"   -> ValKW
-      "fn"    -> ValKW
-      "rec"   -> RecKW
-      "let"   -> LetKW
-      "in"    -> InKW
-      _       -> f name
+    tn =
+      case name of
+        "data"  -> DataKW
+        "match" -> MatchKW
+        "with"  -> WithKW
+        "end"   -> EndKW
+        "val"   -> ValKW
+        "fn"    -> ValKW
+        "rec"   -> RecKW
+        "let"   -> LetKW
+        "in"    -> InKW
+        _       -> f name
 
 symLex :: String -> (Token, String)
 symLex s = symLexFrom s symbols

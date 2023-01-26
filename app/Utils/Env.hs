@@ -35,9 +35,10 @@ bind (k, v) (Env m) = Env $ M.insertWith append k (v :| []) m
 delete :: Ord k => k -> Env k v -> Env k v
 delete k (Env m) = Env $ M.update maybeTail k m
   where
-    maybeTail l = case tail l of
-      []    -> Nothing
-      h : t -> Just (h :| t)
+    maybeTail l =
+      case tail l of
+        []    -> Nothing
+        h : t -> Just (h :| t)
 
 fromList :: Ord k => [(k, v)] -> Env k v
 fromList = foldr bind empty
