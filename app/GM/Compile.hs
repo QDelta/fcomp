@@ -61,7 +61,9 @@ compileFn (name, params, body) =
        arity = length params
        clean = [Update arity, Pop arity]
 
-compileList :: (Stack -> CoreExpr -> CState Code) -> Stack -> [CoreExpr] -> CState Code
+type GMCompiler a = Stack -> a -> CState Code
+
+compileList :: GMCompiler CoreExpr -> Stack -> [CoreExpr] -> CState Code
 compileList comp st es = go st (reverse es)
   where
     go :: Stack -> [CoreExpr] -> CState Code
@@ -73,7 +75,7 @@ compileList comp st es = go st (reverse es)
          return (c ++ cs)
 
 -- eval expr to WHNF on stack
-compileWHNF :: Stack -> CoreExpr -> CState Code
+compileWHNF :: GMCompiler CoreExpr
 compileWHNF _ (IntCE n) =
   return [PushI n]
 compileWHNF st (HNFCE (name, arity, tag) params) =
@@ -81,8 +83,12 @@ compileWHNF st (HNFCE (name, arity, tag) params) =
      return (paramC ++ [pack tag arity])
 compileWHNF st (CaseCE e brs) =
   do eCode <- compileWHNF st e
-     brCodes <- traverse (compileBranch st) brs
+     brCodes <- traverse compBr brs
      return $ eCode ++ [CaseJ brCodes]
+  where
+    compBr (tag, binds, body) =
+      do bCode <- compileWHNF (pushBinds st binds) body
+         return (tag, Split : bCode ++ [Slide (length binds)])
 compileWHNF st e@(AppCE (GFnCE op) opr)
   | getIdent op `M.member` prim1 =
       do code <- compileWHNF st opr
@@ -109,7 +115,7 @@ compileWHNF st e =
      return $ code ++ [Eval]
 
 -- create a thunk on stack
-compileLazy :: Stack -> CoreExpr -> CState Code
+compileLazy :: GMCompiler CoreExpr
 compileLazy _ (GFnCE name) =
   return [PushG name]
 compileLazy _ (GConstrCE name) =
@@ -127,13 +133,14 @@ compileLazy st (AppCE e1 e2) =
   do code2 <- compileLazy st e2
      code1 <- compileLazy (push st 1) e1
      return $ code2 ++ code1 ++ [MkApp]
-compileLazy st e@(CaseCE _ _) =
-  do (_, arity, code) <- compileFn (undefined, localPs, e)
-     liftedId <- addLiftedFn arity code
-     let lamExpr = liftedApply liftedId localPs
-     compileLazy st lamExpr
+compileLazy st (CaseCE e brs) =
+  do eCode <- compileWHNF st e
+     brCodes <- traverse compBr brs
+     return $ eCode ++ [CaseJ brCodes]
   where
-    localPs = S.toList $ localVarsExcept S.empty e
+    compBr (tag, binds, body) =
+      do bCode <- compileLazy (pushBinds st binds) body
+         return (tag, Split : bCode ++ [Slide (length binds)])
 compileLazy st (LetCE (bindId, bindE) e) =
   do bCode <- compileLazy st bindE
      eCode <- compileLazy (pushBinds st [bindId]) e
@@ -154,8 +161,7 @@ compileLazy st (LambdaCE params e) =
   where
     localPs = S.toList $ localVarsExcept (S.fromList params) e
 
-compileLetRBind :: Stack -> (CoreBind, Int) -> CState Code
--- special case: lambda in let rec
+compileLetRBind :: GMCompiler (CoreBind, Int)
 compileLetRBind st ((bindId, LambdaCE params e), offset) =
   do liftId <- reserveLift
      let replaceExpr = liftedApply liftId localPs
@@ -168,11 +174,6 @@ compileLetRBind st ((bindId, LambdaCE params e), offset) =
 compileLetRBind st ((_, bindE), offset) =
   do code <- compileLazy st bindE
      return $ code ++ [Update offset]
-
-compileBranch :: Stack -> CoreBranch -> CState (Int, Code)
-compileBranch st (tag, binds, body) =
-  do bCode <- compileWHNF (pushBinds st binds) body
-     return (tag, Split : bCode ++ [Slide (length binds)])
 
 compileConstr :: CoreConstr -> CompiledCoreConstr
 compileConstr (name, arity, tag) =

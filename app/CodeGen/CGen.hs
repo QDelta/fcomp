@@ -1,6 +1,7 @@
 module CodeGen.CGen (codeGen) where
 
 import qualified Data.Map as M
+
 import Common.Def
 import GM.Compile
 import GM.Def

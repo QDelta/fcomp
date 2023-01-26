@@ -1,4 +1,3 @@
-#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -250,8 +249,8 @@ void inst_mkapp(void) {
     p->type = NAPP;
     p->left = p0;
     p->right = p1;
-    POP_N(node_ptr_t, 2);
-    PUSH(node_ptr_t, p);
+    POP(node_ptr_t);
+    PEEK(node_ptr_t) = p;
 }
 
 void inst_update(i64_t offset) {
@@ -259,6 +258,7 @@ void inst_update(i64_t offset) {
     POP(node_ptr_t);
     PEEK_OFFSET(node_ptr_t, offset)->type = NIND;
     PEEK_OFFSET(node_ptr_t, offset)->to = p;
+    // PEEK_OFFSET(node_ptr_t, offset) = p;
 }
 
 void inst_pack(i64_t tag, i64_t arity) {
@@ -291,8 +291,7 @@ void inst_slide(i64_t n) {
 
 void inst_eval(void) {
     node_ptr_t p = PEEK(node_ptr_t);
-    POP(node_ptr_t);
-    PUSH(ptr_t, bp);
+    PEEK(ptr_t) = bp;
     bp = sp;
     PUSH(node_ptr_t, p);
 
@@ -334,8 +333,7 @@ void inst_eval(void) {
 eval_data:
     sp = bp;
     bp = PEEK(ptr_t);
-    POP(ptr_t);
-    PUSH(node_ptr_t, p);
+    PEEK(node_ptr_t) = p;
 }
 
 void inst_pop(i64_t n) {
@@ -355,8 +353,8 @@ void inst_alloc(i64_t n) {
         node_ptr_t p0 = PEEK_OFFSET(node_ptr_t, 0); \
         node_ptr_t p1 = PEEK_OFFSET(node_ptr_t, 1); \
         node_ptr_t p = INT_NODE((i64_t)(GET_INT_VAL(p0) op GET_INT_VAL(p1))); \
-        POP_N(node_ptr_t, 2); \
-        PUSH(node_ptr_t, p); \
+        POP(node_ptr_t); \
+        PEEK(node_ptr_t) = p; \
     } while (0) \
 
 void inst_add(void) { INST_INT_ARITH_BINOP(+); }
@@ -374,8 +372,7 @@ void inst_isle(void) { INST_INT_ARITH_BINOP(<=); }
 void inst_not(void) {
     node_ptr_t p0 = PEEK(node_ptr_t);
     node_ptr_t p = INT_NODE((i64_t)(! GET_INT_VAL(p0)));
-    POP(node_ptr_t);
-    PUSH(node_ptr_t, p);
+    PEEK(node_ptr_t) = p;
 }
 
 i64_t tagof(node_ptr_t p) {
