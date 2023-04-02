@@ -1,7 +1,7 @@
 -include Makefile.config
 
 CC     ?= gcc
-CFLAGS ?= -Wall -O2
+CFLAGS ?= -Wall -O2 -fno-strict-aliasing
 
 TMP_DIR ?= build
 

@@ -329,21 +329,21 @@ unify l r =
        (DataT n1 ts1, DataT n2 ts2) ->
          if n1 == n2
          then traverse_ (uncurry unify) (zip ts1 ts2)
-         else unifyError n1 n2
+         else unifyError lt rt
        (lt, rt) -> unifyError lt rt
 
 unifyP :: Int -> MType -> TState ()
 unifyP p t =
   case t of
     VarT p1 | p == p1 -> return ()
-    t | occurs p t -> unifyError p t
+    t | occurs p t -> unifyError (VarT p) t
       | otherwise -> bindV (p, t)
   where
     occurs p (VarT p1) = p == p1
     occurs p (ArrT l r) = occurs p l || occurs p r
     occurs p (DataT _ ts) = any (occurs p) ts
 
-unifyError :: (Show a, Show b) => a -> b -> TState x
+unifyError :: MType -> MType -> TState x
 unifyError t1 t2 =
   typeError $ "can not unify " ++ show t1 ++ " with " ++ show t2
 
